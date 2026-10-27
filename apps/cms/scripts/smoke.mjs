@@ -42,9 +42,9 @@ const storeFr = await get(pagesOf('store', 'fr'))
 const storeEn = await get(pagesOf('store', 'en'))
 check('store: fr home published', storeFr.body.docs?.some((d) => d.slug === 'home'))
 check('store en: translationOf points at the fr doc', storeEn.body.docs?.some((d) => d.slug === 'home' && d.translationOf?.slug === 'home' && d.translationOf?.locale === 'fr'))
-const richBlock = storeFr.body.docs.find((d) => d.slug === 'home')?.layout.find((b) => b.blockType === 'richText')
+const richBlock = storeFr.body.docs?.find((d) => d.slug === 'home')?.layout.find((b) => b.blockType === 'richText')
 check('rich text ships server-made html', /<h2[^>]*>Une page, un CMS/.test(richBlock?.html ?? ''), richBlock?.html?.slice(0, 80))
-check('anonymous read hides the draft', !storeFr.body.docs.some((d) => d.slug === 'brouillon-prive'))
+check('anonymous read hides the draft', Array.isArray(storeFr.body.docs) && !storeFr.body.docs.some((d) => d.slug === 'brouillon-prive'))
 const draftAsk = await get(`/api/pages?where[slug][equals]=brouillon-prive&draft=true`)
 check('anonymous draft=true still hides the draft', draftAsk.body.docs?.length === 0, JSON.stringify(draftAsk.body).slice(0, 120))
 
@@ -61,7 +61,11 @@ check('anonymous cannot list users', (await get('/api/users')).status === 403)
 const anonCreate = await send('POST', '/api/pages', { title: 'x' }, {})
 check('anonymous cannot create a page', anonCreate.status === 403, String(anonCreate.status))
 check('API key reads the draft', (await get('/api/pages?where[slug][equals]=brouillon-prive&draft=true', key)).body.docs?.length === 1)
-const storeId = storeFr.body.docs[0].domain.id
+const storeId = storeFr.body.docs?.[0]?.domain?.id
+if (!storeId) {
+  console.log(`\nFAIL the store read did not answer (${storeFr.status}); stopping`)
+  process.exit(1)
+}
 const dupe = await send('POST', '/api/pages', { title: 'dupe', domain: storeId, locale: 'fr', slug: 'home', _status: 'published' })
 check('duplicate (domain, locale, slug) is refused', dupe.status === 400, String(dupe.status))
 const delDomain = await send('DELETE', `/api/domains/${storeId}`)

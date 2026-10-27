@@ -59,10 +59,14 @@ TAG="$REPO/cms:$(git rev-parse --short HEAD)$(git diff --quiet HEAD -- . || echo
 gcloud builds submit --tag="$TAG" --region="$REGION" --machine-type=e2-highcpu-8 --quiet .
 
 echo "== deploy"
+# Public access is a one-time operator step, kept out of this script: the workspace org's
+# domain-restricted sharing refuses `allUsers`, so the service skips the invoker check instead:
+#   gcloud run services update showcase-cms --region=us-east5 --no-invoker-iam-check
+# The setting persists across deploys. The admin, drafts and writes still need a login or key.
 # One instance at most: the rate limiter's counters live in memory, and the worst-case bill
 # stays one instance's worth. Request-based billing (CPU only while answering), zero when idle.
 gcloud run deploy "$SERVICE" --image="$TAG" --region="$REGION" --port=3000 \
-  --allow-unauthenticated --min-instances=0 --max-instances=1 --concurrency=80 \
+  --min-instances=0 --max-instances=1 --concurrency=80 \
   --cpu=1 --memory=512Mi --timeout=60 --cpu-boost \
   --set-secrets=DATABASE_URL=cms-database-url:latest,PAYLOAD_SECRET=cms-payload-secret:latest \
   --set-env-vars="SERVER_URL=$URL,GCS_BUCKET=$BUCKET" --quiet

@@ -39,6 +39,9 @@ Needs `gcloud auth login`, podman, and `~/.config/kos/showcase-cms.prod.env` (mo
 `DATABASE_URL` (Neon) and `PAYLOAD_SECRET`. The script migrates Neon from here, builds and pushes
 the image, deploys (max 1 instance, 512 MiB, zero when idle) and runs the smoke against the live
 URL. Prod admin login + API key: `~/.config/kos/showcase-cms.prod-admin.env`.
+Live: https://showcase-cms-1065657380974.us-east5.run.app (project `showcase-cms`, 1 CAD budget alert).
+One-time, by the operator: the workspace org refuses `allUsers`, so public access is
+`gcloud run services update showcase-cms --region=us-east5 --no-invoker-iam-check`; it persists.
 `deploy/compose.yml` + `Caddyfile` run the same image with its own Postgres on any one VM.
 
 ## Read contract (for the sites)
