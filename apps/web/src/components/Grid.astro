@@ -1,0 +1,19 @@
+---
+// The collection grid (R4 Collection board): a two-thirds marquee, three thirds, two halves,
+// repeating. Filtered, every product takes a half (CSS: .row--grid.is-filtered).
+import type { Locale } from '../i18n'
+import type { Card } from '../lib/shopify'
+import ProductTile from './ProductTile.astro'
+
+interface Props {
+  products: Card[]
+  locale: Locale
+  id: string
+  label: string
+}
+const { products, locale, id, label } = Astro.props
+const SPANS = ['s8', 's4', 's4', 's4', 's4', 's6', 's6']
+---
+<section class="row row--grid" id={id} aria-label={label}>
+  {products.map((p, i) => <ProductTile product={p} locale={locale} span={SPANS[i % SPANS.length]!} type={p.productType} />)}
+</section>

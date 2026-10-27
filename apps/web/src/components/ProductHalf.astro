@@ -1,0 +1,25 @@
+---
+// A product half tile (R4 Home board, two-half-product-tiles): name and controls centred, the
+// photo runs to the tile's edges. The controls are the product form island.
+import { localePath, type Locale } from '../i18n'
+import { formProduct, type ProductData } from '../lib/shopify'
+import Plate from './Plate.astro'
+import ProductForm from './ProductForm'
+
+interface Props {
+  product: ProductData
+  locale: Locale
+}
+const { product: p, locale } = Astro.props
+const path = localePath(locale, `/products/${p.handle}`)
+---
+<article class="tile t-prod s6" aria-labelledby={`half-${p.handle}`}>
+  <div class="prod__copy">
+    <h2 id={`half-${p.handle}`} data-owner="Shopify"><a href={path}>{p.title}</a></h2>
+    {p.summary?.value && <p class="spec" data-owner="Shopify">{p.summary.value}</p>}
+    <ProductForm client:visible product={formProduct(p)} locale={locale} layout="half" path={path} />
+  </div>
+  <figure class="prod__shot fig" data-owner="Shopify">
+    <Plate image={p.featuredImage} title={p.title} tag={p.summary?.value} locale={locale} />
+  </figure>
+</article>

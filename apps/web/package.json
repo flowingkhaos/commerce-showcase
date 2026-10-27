@@ -1,0 +1,31 @@
+{
+  "name": "@showcase/web",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "hydrogen skills check --mode=warn && astro dev",
+    "build": "astro build",
+    "preview": "wrangler dev",
+    "typecheck": "astro check && hydrogen gql check",
+    "dev-vars": "node scripts/dev-vars.mjs"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "14.4.2",
+    "@astrojs/preact": "6.1.1",
+    "@nanostores/preact": "1.1.1",
+    "@shopify/hydrogen": "2026.10.2",
+    "astro": "7.4.2",
+    "nanostores": "1.5.5",
+    "preact": "11.0.2"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.12",
+    "typescript": "6.0.3",
+    "wrangler": "4.154.0"
+  },
+  "engines": {
+    "node": ">=24.20.0"
+  }
+}

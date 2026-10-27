@@ -1,0 +1,26 @@
+---
+// The board's action pair: one blue pill (primary), one ghost (secondary).
+type Link = { label: string; url: string; style: 'primary' | 'secondary'; sub?: string }
+interface Props {
+  links: Link[]
+  owner: 'Payload' | 'Code'
+}
+const { links, owner } = Astro.props
+---
+<div class="acts" data-owner={owner}>
+  {
+    links.map((l) =>
+      l.style === 'primary' ? (
+        <a class="cta" href={l.url}>
+          {l.label}
+          {l.sub && <small>{l.sub}</small>}
+        </a>
+      ) : (
+        <a class="ghost" href={l.url}>
+          <span class="led" aria-hidden="true" />
+          {l.label}
+        </a>
+      ),
+    )
+  }
+</div>

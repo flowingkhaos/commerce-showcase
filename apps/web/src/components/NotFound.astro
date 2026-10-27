@@ -1,0 +1,26 @@
+---
+import { localePath, t, type Locale } from '../i18n'
+import Base from '../layouts/Base.astro'
+import Acts from './Acts.astro'
+
+interface Props {
+  locale: Locale
+}
+const { locale } = Astro.props
+---
+<Base locale={locale} title={`${t(locale, 'notFoundTitle')} — OVRLD`} paths={{ en: '/', fr: '/fr' }} noindex>
+  <section class="row" aria-labelledby="nf-h">
+    <div class="tile t-404 s12">
+      <div class="beams" aria-hidden="true"><div class="beams__sweep"></div></div>
+      <h1 id="nf-h">{t(locale, 'notFoundTitle')}</h1>
+      <p>{t(locale, 'notFoundText')}</p>
+      <Acts
+        links={[
+          { label: t(locale, 'backHome'), url: localePath(locale, '/'), style: 'primary' },
+          { label: t(locale, 'shopEquipment'), url: localePath(locale, '/collections/equipment'), style: 'secondary' },
+        ]}
+        owner="Code"
+      />
+    </div>
+  </section>
+</Base>

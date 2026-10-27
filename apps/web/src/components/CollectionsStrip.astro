@@ -1,0 +1,79 @@
+---
+// The collections strip (R4 Home board): Bank A, a dense list over its photo, beside Bank B, photo
+// channels. Store code until the CMS has a collectionList block. Titles and photos are Shopify's;
+// the line under each title lists Shopify's product names (Payload's collection copy doesn't
+// exist yet).
+import { localePath, t, type Locale } from '../i18n'
+import { lowestPrice, price, shopifyImageUrl, srcSet } from '../lib/format'
+import { getBanks } from '../lib/shopify'
+
+interface Props {
+  locale: Locale
+}
+const { locale } = Astro.props
+const [a, b] = await getBanks(locale)
+const ml = t(locale, 'moneyLocale')
+const priced = (products: Parameters<typeof lowestPrice>[0]) => {
+  const { lowest, from } = lowestPrice(products)
+  return { amount: price(lowest, ml, true), from }
+}
+const href = (handle: string) => localePath(locale, `/collections/${handle}`)
+---
+<section class="row" id="collections" aria-labelledby="col-h">
+  <div class="tile t-bankA s4">
+    <h2 id="col-h">{t(locale, 'collections')}</h2>
+    <h3 class="bank-h">{t(locale, 'bankA')} · <span data-owner="Shopify">{a!.top.title}</span></h3>
+    <ul>
+      {
+        a!.subs.map((c) => {
+          const p = priced(c.products.nodes)
+          return (
+            <li>
+              <a class="lrow" href={href(c.handle)}>
+                <span class="jack" aria-hidden="true" />
+                <span class="lrow__t" data-owner="Shopify">{c.title}</span>
+                <span class="lrow__d" data-owner="Shopify">{c.products.nodes.map((n) => n.title).join(', ')}</span>
+                <span class="lrow__p" data-owner="Shopify">{p.from && t(locale, 'from')} <b>{p.amount}</b></span>
+              </a>
+            </li>
+          )
+        })
+      }
+    </ul>
+    {
+      a!.top.image && (
+        <figure class="bankA__art fig" data-owner="Shopify">
+          <div class="fill">
+            <div class="film">
+              <img src={shopifyImageUrl(a!.top.image.url, 640)} srcset={srcSet(a!.top.image.url, 640)} alt={a!.top.image.altText ?? ''} loading="lazy" decoding="async" />
+            </div>
+          </div>
+        </figure>
+      )
+    }
+  </div>
+  <div class="tile t-bankB s8">
+    <h3 class="bank-h">{t(locale, 'bankB')} · <span data-owner="Shopify">{b!.top.title}</span></h3>
+    <ul class="cards">
+      {
+        b!.subs.map((c) => {
+          const p = priced(c.products.nodes)
+          return (
+            <li>
+              <a class="card" href={href(c.handle)}>
+                <figure class="fig" data-owner="Shopify">
+                  <div class="film">
+                    {c.image && <img src={shopifyImageUrl(c.image.url, 560)} srcset={srcSet(c.image.url, 560)} alt={c.image.altText ?? ''} loading="lazy" decoding="async" />}
+                  </div>
+                </figure>
+                <span class="card__t" data-owner="Shopify">{c.title}</span>
+                <span class="card__p" data-owner="Shopify">{p.from && t(locale, 'from')} <b>{p.amount}</b></span>
+                <span class="card__d" data-owner="Shopify">{c.products.nodes.map((n) => n.title).join(', ')}</span>
+              </a>
+            </li>
+          )
+        })
+      }
+    </ul>
+  </div>
+</section>

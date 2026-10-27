@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Deploys to the clevrstart account. `account_id` is pinned at deploy time (phase 2), from
+  // CLOUDFLARE_ACCOUNT_ID, so no account value lives in the public repo.
+  "name": "commerce-showcase",
+  // Shopify routes run before Astro's router; everything else is a prerendered asset.
+  "main": "./src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./dist/client",
+  },
+  "observability": { "enabled": true },
+}

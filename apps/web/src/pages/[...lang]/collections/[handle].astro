@@ -1,0 +1,62 @@
+---
+// Collection (R4 Collection board): header tile with Shopify's title, working filter chips by
+// product type, and the grid of Beam Plate frames.
+import Acts from '../../../components/Acts.astro'
+import FilterChips from '../../../components/FilterChips'
+import Grid from '../../../components/Grid.astro'
+import { localeFromParam, t } from '../../../i18n'
+import Base from '../../../layouts/Base.astro'
+import { CMS_ADMIN } from '../../../lib/cms'
+import { getCollection, getCollections } from '../../../lib/shopify'
+
+export async function getStaticPaths() {
+  const handles = (await getCollections('en')).map((c) => c.handle)
+  return handles.flatMap((handle) => [{ params: { lang: undefined, handle } }, { params: { lang: 'fr', handle } }])
+}
+
+const locale = localeFromParam(Astro.params.lang)!
+const handle = Astro.params.handle!
+const [collection, all] = await Promise.all([getCollection(locale, handle), getCollections(locale)])
+if (!collection) throw new Error(`Shopify: collection "${handle}" vanished during the build`)
+const products = collection.products.nodes
+
+// One chip per product type. Its label is the Shopify sub-collection that holds exactly those
+// products (so French reads "Cages et bancs"); the raw type is the fallback.
+const types = [...new Set(products.map((p) => p.productType))]
+const chips = types.map((type) => {
+  const these = new Set(products.filter((p) => p.productType === type).map((p) => p.handle))
+  const match = all.find(
+    (c) => c.handle !== handle && c.products.nodes.length === these.size && c.products.nodes.every((p) => these.has(p.handle)),
+  )
+  return { key: type, label: match?.title ?? type, count: these.size }
+})
+const n = products.length
+---
+<Base
+  locale={locale}
+  title={`${collection.title} — OVRLD`}
+  paths={{ en: `/collections/${handle}`, fr: `/fr/collections/${handle}` }}
+  noindex
+>
+  <section class="row" aria-labelledby="col-h">
+    <div class="tile t-colhead s12">
+      <div class="beams" aria-hidden="true"><div class="beams__sweep"></div></div>
+      <h1 id="col-h" data-owner="Shopify">{collection.title}</h1>
+      <p class="spec colhead__n" data-owner="Shopify">{n === 1 ? t(locale, 'colCountOne') : t(locale, 'colCount', { n })}</p>
+      <Acts links={[{ label: t(locale, 'openCms'), sub: t(locale, 'openCmsSub'), url: CMS_ADMIN, style: 'primary' }]} owner="Code" />
+    </div>
+  </section>
+
+  {
+    chips.length > 1 && (
+      <section class="row" aria-labelledby="flt-h">
+        <div class="tile t-chips s12">
+          <h2 id="flt-h">{t(locale, 'filter')}</h2>
+          <FilterChips client:visible chips={chips} total={n} gridId="grid" labelId="flt-h" locale={locale} />
+        </div>
+      </section>
+    )
+  }
+
+  <Grid products={products} locale={locale} id="grid" label={t(locale, 'colProducts', { title: collection.title })} />
+</Base>

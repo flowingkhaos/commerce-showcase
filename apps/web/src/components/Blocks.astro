@@ -1,0 +1,204 @@
+---
+// A Payload page's blocks, in CMS order, each as its Marquee Wall tile. Section → block map from
+// the design lock: hero-marquee-tile `hero`, product halves `productGrid` (≤ 2 products),
+// how-it's-built tile `cta`, editorial story tile `mediaText`. `faq` and `banner` have no board
+// tile; they use the wall's vocabulary (see "store additions" in wall.css).
+import { localePath, t, type Locale } from '../i18n'
+import { CMS_ADMIN, type Block } from '../lib/cms'
+import { getCollection, getProduct } from '../lib/shopify'
+import Acts from './Acts.astro'
+import CollectionsStrip from './CollectionsStrip.astro'
+import Grid from './Grid.astro'
+import ProductHalf from './ProductHalf.astro'
+
+interface Props {
+  blocks: Block[]
+  locale: Locale
+}
+const { blocks, locale } = Astro.props
+
+// Shopify reads first, so the markup below stays synchronous.
+const grids = new Map(
+  await Promise.all(
+    blocks.flatMap((b) =>
+      b.blockType === 'productGrid'
+        ? [
+            (async () => {
+              // An unknown collection handle renders nothing (the CMS may name one Shopify lacks).
+              const products = (await getCollection(locale, b.collectionHandle, b.limit))?.products.nodes ?? []
+              const halves =
+                products.length > 0 && products.length <= 2
+                  ? (await Promise.all(products.map((p) => getProduct(locale, p.handle)))).flatMap((r) => (r.product ? [r.product] : []))
+                  : []
+              return [b.id, { products, halves }] as const
+            })(),
+          ]
+        : [],
+    ),
+  ),
+)
+// The collections strip follows the first productGrid until a CMS collectionList block exists.
+const firstGrid = blocks.findIndex((b) => b.blockType === 'productGrid')
+const stripAt = firstGrid === -1 ? blocks.length - 1 : firstGrid
+const firstHero = blocks.findIndex((b) => b.blockType === 'hero')
+
+// With no CMS links, the hero still carries the page's one action (design lock: "Open the CMS").
+const fallbackLinks = [
+  { label: t(locale, 'openCms'), sub: t(locale, 'openCmsSub'), url: CMS_ADMIN, style: 'primary' as const },
+  { label: t(locale, 'shopEquipment'), url: localePath(locale, '/collections/equipment'), style: 'secondary' as const },
+]
+const led = { info: 'led led--blue', success: 'led led--green', warning: 'led led--yellow' }
+const SEGS = ['b', 'b', 'b', 'b', 'g', 'g', 'g', 'g', 'g', 'g', 'y', '', '', '']
+---
+{
+  blocks.map((b, i) => (
+    <>
+      {b.blockType === 'hero' && (
+        <section class="row" aria-labelledby={`h-${b.id}`}>
+          <div class="tile t-hero s12">
+            <div class="beams" aria-hidden="true"><div class="beams__sweep" /></div>
+            <div class="hero__copy">
+              <div class="meter" role="img" aria-label={t(locale, 'meterLabel')}>
+                {SEGS.map((c, k) =>
+                  c ? (
+                    <span class:list={['seg on', c, k >= 8 && 'scrub']} style={k >= 8 ? `--i:${k}; --k:${k - 8}` : `--i:${k}`}>
+                      {c === 'y' && <span class="plus">+1</span>}
+                    </span>
+                  ) : (
+                    <span class="seg" />
+                  ),
+                )}
+              </div>
+              {i === firstHero ? (
+                <h1 id={`h-${b.id}`} data-owner="Payload">{b.heading}</h1>
+              ) : (
+                <h2 id={`h-${b.id}`} class="hero__h" data-owner="Payload">{b.heading}</h2>
+              )}
+              {b.subheading && <p class="hero__sub" data-owner="Payload">{b.subheading}</p>}
+              {b.links?.length ? <Acts links={b.links} owner="Payload" /> : <Acts links={fallbackLinks} owner="Code" />}
+            </div>
+            {b.image && (
+              <figure class="hero__shot fig" data-owner="Payload">
+                <div class="ph"><img src={b.image.url} alt={b.image.alt} width={b.image.width ?? undefined} height={b.image.height ?? undefined} /></div>
+              </figure>
+            )}
+          </div>
+        </section>
+      )}
+
+      {b.blockType === 'richText' && b.html && (
+        <section class="row">
+          <div class="tile t-text s12">
+            <div class="rich" data-owner="Payload" set:html={b.html} />
+          </div>
+        </section>
+      )}
+
+      {b.blockType === 'mediaText' &&
+        (!b.image ? (
+          <section class="row">
+            <div class="tile t-text s12">
+              {b.heading && <h2 data-owner="Payload">{b.heading}</h2>}
+              {b.html && <div class="rich" data-owner="Payload" set:html={b.html} />}
+            </div>
+          </section>
+        ) : b.imagePosition === 'left' ? (
+          <section class="row" aria-labelledby={b.heading ? `m-${b.id}` : undefined}>
+            <div class="tile sun s8" data-owner="Payload">
+              <div class="fill"><div class="film"><img src={b.image.url} alt={b.image.alt} loading="lazy" decoding="async" /></div></div>
+              {b.heading && <h2 id={`m-${b.id}`} data-owner="Payload">{b.heading}</h2>}
+            </div>
+            <div class="tile t-text s4">{b.html && <div class="rich" data-owner="Payload" set:html={b.html} />}</div>
+          </section>
+        ) : (
+          <section class="row" aria-labelledby={b.heading ? `m-${b.id}` : undefined}>
+            <div class="tile t-text s4">
+              {b.heading && <h2 id={`m-${b.id}`} data-owner="Payload">{b.heading}</h2>}
+              {b.html && <div class="rich" data-owner="Payload" set:html={b.html} />}
+            </div>
+            <div class="tile t-photo s8" data-owner="Payload">
+              <div class="fill"><div class="film"><img src={b.image.url} alt={b.image.alt} loading="lazy" decoding="async" /></div></div>
+            </div>
+          </section>
+        ))}
+
+      {b.blockType === 'featureList' && (
+        <section class="row">
+          <div class="tile t-feat s12">
+            <div class="t-feat__intro" data-owner="Payload">
+              {b.heading && <h2>{b.heading}</h2>}
+              {b.intro && <p>{b.intro}</p>}
+            </div>
+            <ol class="seq" data-owner="Payload">
+              {(b.items ?? []).map((item, k, all) => (
+                <li>
+                  <span class="steps" aria-hidden="true">{all.map((_, j) => <span class:list={['led', j <= k && 'on']} />)}</span>
+                  <h3>{item.title}</h3>
+                  {item.text && <p>{item.text}</p>}
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+      )}
+
+      {b.blockType === 'cta' && (
+        <section class="row" aria-labelledby={`c-${b.id}`}>
+          <div class="tile t-built s12">
+            <div class="beams" aria-hidden="true"><div class="beams__sweep" /></div>
+            <h2 id={`c-${b.id}`} data-owner="Payload">{b.heading}</h2>
+            {b.text && <p data-owner="Payload">{b.text}</p>}
+            {b.links?.length ? <Acts links={b.links} owner="Payload" /> : null}
+          </div>
+        </section>
+      )}
+
+      {b.blockType === 'faq' && (
+        <section class="row">
+          <div class="tile t-faq s12">
+            {b.heading && <h2 data-owner="Payload">{b.heading}</h2>}
+            <div class="faq" data-owner="Payload">
+              {(b.items ?? []).map((item) => (
+                <details>
+                  <summary><span class="led" aria-hidden="true" />{item.question}</summary>
+                  <p>{item.answer}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {b.blockType === 'banner' && (
+        <section class="row">
+          <div class="tile t-banner s12" data-owner="Payload">
+            <p><span class={led[b.style] ?? 'led'} aria-hidden="true" />{b.text}</p>
+            {b.link?.url && <a href={b.link.url}>{b.link.label || b.link.url}</a>}
+          </div>
+        </section>
+      )}
+
+      {b.blockType === 'productGrid' &&
+        (() => {
+          const g = grids.get(b.id)
+          if (!g || !g.products.length) return null
+          return (
+            <>
+              {b.heading && (
+                <section class="row"><div class="tile t-xs s12"><h2 data-owner="Payload">{b.heading}</h2></div></section>
+              )}
+              {g.halves.length ? (
+                <section class="row" aria-label={b.heading ?? t(locale, 'twoProducts')}>
+                  {g.halves.map((p) => <ProductHalf product={p} locale={locale} />)}
+                </section>
+              ) : (
+                <Grid products={g.products} locale={locale} id={`grid-${b.id}`} label={b.heading ?? t(locale, 'twoProducts')} />
+              )}
+            </>
+          )
+        })()}
+
+      {i === stripAt && <CollectionsStrip locale={locale} />}
+    </>
+  ))
+}

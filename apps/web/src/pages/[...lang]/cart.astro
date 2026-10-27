@@ -1,0 +1,27 @@
+---
+// The full /cart page: the drawer's no-JS fallback, rendered in the Worker from the real cart
+// (hydrogen-cart-ui: "the /cart page must render from the server data path").
+import { env } from 'cloudflare:workers'
+import { CartPage } from '../../components/Bag'
+import { localeFromParam, t } from '../../i18n'
+import Base from '../../layouts/Base.astro'
+import { cartHandlers, requestShopify } from '../../lib/storefront'
+
+export const prerender = false
+
+const locale = localeFromParam(Astro.params.lang)
+if (!locale) return new Response(null, { status: 404 })
+
+const { requestContext, storefrontClient } = requestShopify(Astro.request, env)
+const { data } = await cartHandlers.get({ storefrontClient, request: Astro.request })
+// A shopper's cart: never cached anywhere.
+Astro.response.headers.set('Cache-Control', 'private, no-store')
+requestContext.applyResponseHeaders(Astro.response.headers)
+---
+<Base locale={locale} title={`${t(locale, 'bag')} — OVRLD`} paths={{ en: '/cart', fr: '/fr/cart' }} noindex cartInitial={data}>
+  <section class="row" aria-labelledby="bag-page-h">
+    <div class="tile s12">
+      <CartPage client:load locale={locale} initialData={data} />
+    </div>
+  </section>
+</Base>

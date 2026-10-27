@@ -1,0 +1,209 @@
+---
+// The page shell from the Marquee Wall boards: showcase bar, nav, the wall, the dense footer
+// under the giant OVRLD sign-off, and the bag. Nav and footer labels are store code for now:
+// Payload's `site` global doesn't exist yet, so they say data-owner="Code".
+import { getShopifyScriptTags } from '@shopify/hydrogen'
+import { PUBLIC_STORE_DOMAIN } from 'astro:env/server'
+import CartDrawer, { BagButton } from '../components/Bag'
+import { localePath, t, type Locale } from '../i18n'
+import { CMS_ADMIN } from '../lib/cms'
+import { marketFor } from '../lib/market'
+import { getBanks, getShopId } from '../lib/shopify'
+import '../styles/wall.css'
+
+interface Props {
+  locale: Locale
+  title: string
+  description?: string | null
+  /** This page's path in each language, for the language switch and hreflang. */
+  paths: Record<Locale, string>
+  noindex?: boolean
+  cartInitial?: Parameters<typeof CartDrawer>[0]['initialData']
+}
+const { locale, title, description, paths, noindex = false, cartInitial } = Astro.props
+const other: Locale = locale === 'fr' ? 'en' : 'fr'
+const [banks, shopId] = await Promise.all([getBanks(locale), getShopId()])
+const { country, language } = marketFor(locale)
+
+// Only Shopify's runtime bootstrap and Standard Actions (the cart's transport). Analytics,
+// consent and perf scripts stay out until the showcase needs them.
+const shopifyTags = getShopifyScriptTags({
+  i18n: { country, language },
+  shop: { shopId, storefrontId: '0', myshopifyDomain: PUBLIC_STORE_DOMAIN },
+  shopifyAnalytics: false,
+}).scripts.filter((s) => ['shopify-global-bootstrap', 'shopify-standard-actions'].includes(String(s.attributes?.id)))
+
+const L = (path: string) => localePath(locale, path)
+const nav = [
+  { href: L('/collections/apparel'), label: t(locale, 'navApparel') },
+  { href: L('/collections/equipment'), label: t(locale, 'navEquipment') },
+  { href: `${L('/')}#collections`, label: t(locale, 'navCollections') },
+]
+---
+<!doctype html>
+<html lang={t(locale, 'htmlLang')} class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+    {noindex && <meta name="robots" content="noindex" />}
+    <link rel="alternate" hreflang={t(locale, 'htmlLang')} href={paths[locale]} />
+    <link rel="alternate" hreflang={other} href={paths[other]} />
+    <meta name="color-scheme" content="dark light" />
+    <!-- The room is chosen before paint: dark unless the visitor turned the lights on. -->
+    <script is:inline>
+      try {
+        if (localStorage.getItem('ovrld-mode') === 'light') document.documentElement.classList.remove('dark')
+      } catch {}
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500;700&family=Epilogue:wght@700;800&display=swap"
+    />
+    <link rel="preconnect" href="https://cdn.shopify.com" />
+    {shopifyTags.map(({ attributes, innerHTML }) => <script is:inline {...attributes} set:html={innerHTML ?? ''} />)}
+  </head>
+  <body class="ovrld">
+    <div class="page">
+      <a class="skip" href="#main">{t(locale, 'skip')}</a>
+
+      <aside class="showcase" aria-label={t(locale, 'showcaseLabel')}>
+        <div class="wrap showcase__in">
+          <div class="showcase__slot">
+            <p class="showcase__note" data-owner="Code"><b>{t(locale, 'showcaseLead')}</b>{t(locale, 'showcaseNote')}</p>
+          </div>
+          <div class="showcase__acts">
+            <a class="sc-cms" href={CMS_ADMIN}>
+              {t(locale, 'openCms')}
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" /></svg>
+            </a>
+          </div>
+        </div>
+      </aside>
+
+      <header class="nav-wrap">
+        <nav class="nav wrap" aria-label={t(locale, 'navLabel')}>
+          <a class="wordmark" href={L('/')} aria-label={t(locale, 'homeLabel')}>OVRLD</a>
+          <div class="nav__group" data-owner="Code">
+            <ul class="nav__links">
+              {nav.map((n) => <li><a href={n.href}><span class="led" aria-hidden="true" />{n.label}</a></li>)}
+            </ul>
+          </div>
+          <div class="nav__end">
+            <div class="lang" role="group" aria-label={t(locale, 'language')}>
+              <a href={paths.en} lang="en" hreflang="en" aria-current={locale === 'en' ? 'page' : undefined}><span class="led" aria-hidden="true" />EN</a>
+              <a href={paths.fr} lang="fr" hreflang="fr" aria-current={locale === 'fr' ? 'page' : undefined}><span class="led" aria-hidden="true" />FR</a>
+            </div>
+            <button
+              class="mode"
+              type="button"
+              data-on={t(locale, 'lightsOn')}
+              data-off={t(locale, 'lightsOff')}
+              data-on-label={t(locale, 'lightsOnLabel')}
+              data-off-label={t(locale, 'lightsOffLabel')}
+              aria-label={t(locale, 'lightsOnLabel')}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8" cy="8" r="5.5" /><path d="M8 2.5a5.5 5.5 0 0 1 0 11z" fill="currentColor" stroke="none" /></svg>
+              <span class="mode__txt">{t(locale, 'lightsOn')}</span>
+            </button>
+            <details class="menu">
+              <summary>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2.5 5.5h11M2.5 10.5h11" /></svg>
+                {t(locale, 'menu')}
+              </summary>
+              <div class="menu__panel">
+                <ul>
+                  {nav.map((n) => <li><a href={n.href}><span class="led" aria-hidden="true" />{n.label}</a></li>)}
+                </ul>
+                <div class="lang" role="group" aria-label={t(locale, 'language')}>
+                  <a href={paths.en} lang="en" hreflang="en" aria-current={locale === 'en' ? 'page' : undefined}><span class="led" aria-hidden="true" />EN</a>
+                  <a href={paths.fr} lang="fr" hreflang="fr" aria-current={locale === 'fr' ? 'page' : undefined}><span class="led" aria-hidden="true" />FR</a>
+                </div>
+              </div>
+            </details>
+            <BagButton client:load locale={locale} />
+          </div>
+        </nav>
+      </header>
+
+      <main id="main" class="wrap wall">
+        <slot />
+      </main>
+
+      <footer class="wrap wall foot">
+        <div class="row">
+          <div class="tile t-util s12">
+            <div class="util__go" data-owner="Code">
+              <a class="foot__mark" href={L('/')} aria-label={t(locale, 'homeLabel')}>OVRLD</a>
+              <div class="acts">
+                <a class="cta" href={CMS_ADMIN}>{t(locale, 'openCms')} <small>{t(locale, 'openCmsSub')}</small></a>
+              </div>
+            </div>
+            <div class="foot__cols" data-owner="Code">
+              <nav aria-label={t(locale, 'footShop')}>
+                <h2>{t(locale, 'footShop')}</h2>
+                <ul>{nav.map((n) => <li><a href={n.href}>{n.label}</a></li>)}</ul>
+              </nav>
+              {
+                banks.map(({ top, subs }) => (
+                  <nav aria-label={t(locale, 'footCollectionsOf', { title: top.title })}>
+                    <h2 data-owner="Shopify">{top.title}</h2>
+                    <ul>{subs.map((c) => <li><a href={L(`/collections/${c.handle}`)} data-owner="Shopify">{c.title}</a></li>)}</ul>
+                  </nav>
+                ))
+              }
+              <nav aria-label={t(locale, 'footShowcase')}>
+                <h2>{t(locale, 'footShowcase')}</h2>
+                <ul><li><a href={CMS_ADMIN}>{t(locale, 'openCms')}</a></li></ul>
+              </nav>
+              <nav aria-label={t(locale, 'footStore')}>
+                <h2>{t(locale, 'footStore')}</h2>
+                <ul>
+                  <li><a href={L('/cart')}>{t(locale, 'bag')}</a></li>
+                  <li><a href={paths[other]} lang={other} hreflang={other}>{t(locale, 'otherLang')}</a></li>
+                </ul>
+              </nav>
+              <div>
+                <h2>{t(locale, 'footRunsOn')}</h2>
+                <ul><li><span>Astro</span></li><li><span>Payload 4</span></li><li><span>Shopify</span></li></ul>
+              </div>
+            </div>
+            <div class="legal" data-owner="Code">
+              <p>{t(locale, 'legal')}</p>
+              <p>{t(locale, 'legalNote')}</p>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="tile t-mark s12" aria-hidden="true"><div class="beams"><div class="beams__sweep"></div></div><span class="mark__word">OVRLD</span></div>
+        </div>
+      </footer>
+
+      <CartDrawer client:load locale={locale} initialData={cartInitial} />
+    </div>
+
+    <script is:inline>
+      // The mode toggle: html.dark is the dark room; the label names what a press does.
+      ;(() => {
+        const b = document.querySelector('.mode')
+        const root = document.documentElement
+        const sync = () => {
+          const dark = root.classList.contains('dark')
+          b.querySelector('.mode__txt').textContent = dark ? b.dataset.on : b.dataset.off
+          b.setAttribute('aria-label', dark ? b.dataset.onLabel : b.dataset.offLabel)
+        }
+        sync()
+        b.addEventListener('click', () => {
+          root.classList.toggle('dark')
+          try {
+            localStorage.setItem('ovrld-mode', root.classList.contains('dark') ? 'dark' : 'light')
+          } catch {}
+          sync()
+        })
+      })()
+    </script>
+  </body>
+</html>

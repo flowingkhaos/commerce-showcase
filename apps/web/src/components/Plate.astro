@@ -1,0 +1,41 @@
+---
+// Beam Plate (R3BeamPlate board): one class on the frame, any <img>. A product with no photo
+// keeps an honest frame: its name set on the plate, and where the photo will come from.
+import { t, type Locale } from '../i18n'
+import { shopifyImageUrl, srcSet } from '../lib/format'
+
+type Img = { url: string; altText?: string | null; width?: number | null; height?: number | null }
+interface Props {
+  image?: Img | null
+  title: string
+  tag?: string | null
+  locale: Locale
+  width?: number
+  eager?: boolean
+}
+const { image, title, tag, locale, width = 720, eager = false } = Astro.props
+const word = (title.split(/\s+/).at(-1) ?? title).toUpperCase()
+---
+{
+  image ? (
+    <div class="ph">
+      <img
+        src={shopifyImageUrl(image.url, width)}
+        srcset={srcSet(image.url, width)}
+        alt={image.altText ?? ''}
+        width={image.width ?? undefined}
+        height={image.height ?? undefined}
+        loading={eager ? 'eager' : 'lazy'}
+        decoding="async"
+      />
+    </div>
+  ) : (
+    <div class="ph ph--empty" role="img" aria-label={t(locale, 'photoComingLabel', { title })}>
+      <span class="ph__word" style={`--n:${word.length}`} aria-hidden="true">{word}</span>
+      <span class="ph__slate" aria-hidden="true">
+        <span>{t(locale, 'photoComing')}</span>
+        {tag && <span>{tag}</span>}
+      </span>
+    </div>
+  )
+}

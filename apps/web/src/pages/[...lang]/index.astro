@@ -1,0 +1,17 @@
+---
+// Home: the CMS `home` page's blocks, in CMS order.
+import Blocks from '../../components/Blocks.astro'
+import { localeFromParam } from '../../i18n'
+import Base from '../../layouts/Base.astro'
+import { getPage } from '../../lib/cms'
+
+export const getStaticPaths = () => [{ params: { lang: undefined } }, { params: { lang: 'fr' } }]
+
+const locale = localeFromParam(Astro.params.lang)!
+const page = await getPage(locale, 'home')
+// The home page is seeded content: a missing doc fails the build rather than shipping an empty wall.
+if (!page) throw new Error(`CMS: the store domain has no ${locale} home page`)
+---
+<Base locale={locale} title={page.meta?.title ?? 'OVRLD'} description={page.meta?.description} paths={{ en: '/', fr: '/fr' }}>
+  <Blocks blocks={page.layout} locale={locale} />
+</Base>
