@@ -208,6 +208,8 @@ export const collections = [
   { handle: 'free-weights', title: { en: 'Free Weights', fr: 'Poids libres' }, rule: ['TYPE', 'Free Weights'], image: unsplash('photo-1725289572584-5afe9d45119f') },
   { handle: 'conditioning', title: { en: 'Conditioning', fr: 'Conditionnement' }, rule: ['TYPE', 'Conditioning'], image: unsplash('photo-1771270786606-f5a0e57db762') },
   { handle: 'floor-mobility', title: { en: 'Floor & Mobility', fr: 'Sol et mobilité' }, rule: ['TYPE', 'Floor & Mobility'] },
+  // A hand-picked collection: the home page's two half tiles read it (a productGrid block, limit 2).
+  { handle: 'featured', title: { en: 'Featured', fr: 'En vedette' }, products: ['heavyweight-hoodie', 'adjustable-bench'] },
 ] as const
 
 // French for option names and values (sizes and weights stay as they are).

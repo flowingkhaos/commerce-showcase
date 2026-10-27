@@ -146,11 +146,14 @@ for (const p of products) {
 }
 
 const existingC = new Map((await all('collections')).map((c) => [c.handle, c.id]))
+const productIds = new Map((await all('products')).map((p) => [p.handle, p.id]))
 for (const c of collections) {
+  const members = 'products' in c ? c.products.map((h) => productIds.get(h)!) : undefined
   const input = {
     title: c.title.en,
     handle: c.handle,
-    ruleSet: { appliedDisjunctively: false, rules: [{ column: c.rule[0], relation: 'EQUALS', condition: c.rule[1] }] },
+    ...('rule' in c ? { ruleSet: { appliedDisjunctively: false, rules: [{ column: c.rule[0], relation: 'EQUALS', condition: c.rule[1] }] } } : {}),
+    ...(members && !existingC.has(c.handle) ? { products: members } : {}),
     ...('image' in c && !existingC.has(c.handle) ? { image: { src: c.image, altText: c.title.en } } : {}),
   }
   const id = existingC.get(c.handle)
@@ -158,6 +161,9 @@ for (const c of collections) {
     ? await gql(`mutation ($i: CollectionInput!) { collectionUpdate(input: $i) { collection { id } userErrors { field message } } }`, { i: { id, ...input } })
     : await gql(`mutation ($i: CollectionInput!) { collectionCreate(input: $i) { collection { id } userErrors { field message } } }`, { i: input })
   const collectionId = (data.collectionUpdate ?? data.collectionCreate).collection.id
+  if (members && id) {
+    await gql(`mutation ($id: ID!, $p: [ID!]!) { collectionAddProductsV2(id: $id, productIds: $p) { userErrors { field message } } }`, { id, p: members })
+  }
   await publish(collectionId)
   await translate(collectionId, { title: c.title.fr })
   console.log(`collection ${c.handle}`)
