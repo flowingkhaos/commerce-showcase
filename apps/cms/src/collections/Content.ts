@@ -1,11 +1,13 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, Field } from 'payload'
 
 import {
   adminOrOwnDraft,
   adminOrVisitor,
+  anyone,
   blocks,
   contentFields,
   contentIndexes,
+  isAdmin,
   meta,
   publishedOrAdmin,
   visitorSandbox,
@@ -71,5 +73,53 @@ export const Docs: CollectionConfig = {
     { name: 'body', type: 'code', admin: { language: 'markdown' }, required: true },
     meta,
     ...contentFields('docs'),
+  ],
+}
+
+// A product's words. Shopify owns its title, price, stock and images; the slug joins the two.
+const storyBlocks = blocks.filter((b) => ['mediaText', 'featureList', 'richText'].includes(b.slug))
+export const Products: CollectionConfig = {
+  slug: 'products',
+  admin: { useAsTitle: 'slug', group: 'Content', defaultColumns: ['slug', 'domain', 'locale', '_status', 'updatedAt'] },
+  access,
+  hooks,
+  versions,
+  indexes: contentIndexes,
+  fields: [
+    { name: 'story', type: 'blocks', blocks: storyBlocks, maxRows: 8 },
+    { name: 'badges', type: 'array', maxRows: 3, fields: [{ name: 'label', type: 'text', required: true }] },
+    meta,
+    ...contentFields('products', 'The Shopify product handle, exactly as in Shopify.'),
+  ],
+}
+
+const linkList = (name: string): Field => ({
+  name,
+  type: 'array',
+  maxRows: 8,
+  fields: [
+    { name: 'label', type: 'text', required: true },
+    { name: 'url', type: 'text', required: true },
+  ],
+})
+
+// One doc per domain and locale: the menu and footer that site renders. Operator-only.
+export const Site: CollectionConfig = {
+  slug: 'site',
+  versions: false,
+  admin: { group: 'Content', defaultColumns: ['domain', 'locale', 'updatedAt'] },
+  access: { read: anyone, create: isAdmin, update: isAdmin, delete: isAdmin },
+  indexes: [{ fields: ['domain', 'locale'], unique: true }],
+  fields: [
+    { name: 'domain', type: 'relationship', relationTo: 'domains', required: true, admin: { position: 'sidebar' } },
+    { name: 'locale', type: 'select', options: ['fr', 'en'], defaultValue: 'fr', required: true, admin: { position: 'sidebar' } },
+    linkList('nav'),
+    {
+      name: 'footer',
+      type: 'array',
+      maxRows: 6,
+      fields: [{ name: 'heading', type: 'text', required: true }, linkList('links')],
+    },
+    { name: 'footerNote', type: 'text' },
   ],
 }

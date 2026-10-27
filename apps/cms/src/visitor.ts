@@ -9,7 +9,7 @@ import { generatePayloadCookie } from 'payload/shared'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const DAILY_CAP = 300
-const CONTENT = ['pages', 'articles', 'docs'] as const
+const CONTENT = ['pages', 'articles', 'docs', 'products'] as const
 
 const text = (status: number, body: string) =>
   new Response(body, { status, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } })

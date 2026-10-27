@@ -76,6 +76,26 @@ const made = await send('POST', '/api/pages', { title: 'Smoke', domain: storeId,
 check('API key creates a published page', made.status === 201, `${made.status} ${JSON.stringify(made.body).slice(0, 160)}`)
 check('…and anonymous sees it at once', (await get(pagesOf('store', 'fr'))).body.docs.some((d) => d.slug === 'smoke-temp'))
 if (made.body?.doc?.id) check('…and it deletes', (await send('DELETE', `/api/pages/${made.body.doc.id}`)).status === 200)
+const list = { blockType: 'collectionList', heading: 'Shop by collection', items: [{ handle: 'hoodies', description: 'Heavy fleece.' }] }
+const listed = await send('POST', '/api/pages', { title: 'Smoke list', domain: storeId, locale: 'fr', slug: 'smoke-list', _status: 'published', layout: [list] })
+const listBack = listed.body?.doc && (await get(`/api/pages/${listed.body.doc.id}`)).body.layout?.[0]
+check('collectionList block round-trips', listBack?.heading === list.heading && listBack.items?.[0]?.handle === 'hoodies' && listBack.items[0].description === 'Heavy fleece.', `${listed.status} ${JSON.stringify(listBack ?? listed.body).slice(0, 160)}`)
+if (listed.body?.doc?.id) await send('DELETE', `/api/pages/${listed.body.doc.id}`)
+
+// Store content: product words and each site's menus.
+const storeSite = []
+for (const c of ['products', 'site']) {
+  const { status, body } = await get(`/api/${c}?where[domain.slug][equals]=store&depth=1`)
+  check(`${c}: anonymous read 200 with docs`, status === 200 && Array.isArray(body.docs), String(status))
+  check(`${c}: anonymous cannot create`, (await send('POST', `/api/${c}`, { domain: storeId, locale: 'fr', slug: 'x' }, {})).status === 403)
+  if (c === 'site') storeSite.push(...(body.docs ?? []))
+}
+// Until the store's own en menu is seeded, the smoke writes a throwaway one first.
+const siteDoc = { domain: storeId, locale: 'en', nav: [{ label: 'Shop', url: '/en/shop' }], footerNote: 'smoke' }
+const site1 = storeSite.some((d) => d.locale === 'en') ? { status: 201 } : await send('POST', '/api/site', siteDoc)
+const site2 = await send('POST', '/api/site', siteDoc)
+check('site: duplicate (domain, locale) is refused', site1.status === 201 && site2.status === 400, `${site1.status} ${site2.status}`)
+for (const s of [site1, site2]) if (s.body?.doc?.id) await send('DELETE', `/api/site/${s.body.doc.id}`)
 
 // Admin surface.
 const login = await send('POST', '/api/users/login', { email: creds.SHOWCASE_CMS_ADMIN_EMAIL, password: creds.SHOWCASE_CMS_ADMIN_PASSWORD }, {})
@@ -133,6 +153,9 @@ if (!base.startsWith('http://localhost')) {
   check('anonymous: never sees the visitor draft', !(await get(pagesOf('blog-demo', 'fr'))).body.docs.some((d) => d.slug === 'visitor-smoke'))
   if (secret && doc) check('preview: shows the visitor draft', (await get(signed('pages', doc.id))).body.title === 'Visitor smoke')
   if (doc) check('visitor: deletes its own draft', (await send('DELETE', `/api/pages/${doc.id}`, null, v)).status === 200)
+  const product = await send('POST', '/api/products?draft=true', { domain: dom.store, locale: 'fr', slug: 'visitor-smoke', badges: [{ label: 'Nouveau' }] }, v)
+  check('visitor: drafts a product story in the store', product.status === 201 && product.body?.doc?._status === 'draft', `${product.status} ${JSON.stringify(product.body).slice(0, 160)}`)
+  if (product.body?.doc) await send('DELETE', `/api/products/${product.body.doc.id}`, null, v)
   if (me) check('visitor row deletes (admin key)', (await send('DELETE', `/api/users/${me.id}`)).status === 200)
 }
 

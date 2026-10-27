@@ -40,7 +40,7 @@ export const visitorSandbox: CollectionBeforeChangeHook = async ({ data, operati
   }
   if (operation === 'create') {
     let mine = 0
-    for (const c of ['pages', 'articles', 'docs'] as const) {
+    for (const c of ['pages', 'articles', 'docs', 'products'] as const) {
       mine += (await req.payload.count({ collection: c, where: madeBy(req.user!.id), overrideAccess: true, req })).totalDocs
     }
     if (mine >= VISITOR_DOCS) throw new APIError(`Visitors keep ${VISITOR_DOCS} drafts at most: delete one first.`, 403)
@@ -52,7 +52,7 @@ const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 // The three fields every content doc carries, plus its slug.
 // Unique on (domain, locale, slug); a French URL with no French doc is a 404, never English.
-export const contentFields = (collection: CollectionSlug): Field[] => [
+export const contentFields = (collection: CollectionSlug, slugDescription?: string): Field[] => [
   {
     name: 'domain',
     type: 'relationship',
@@ -77,7 +77,7 @@ export const contentFields = (collection: CollectionSlug): Field[] => [
     index: true,
     validate: (value: null | string | undefined) =>
       slugPattern.test(value ?? '') || 'Lowercase letters, digits and single dashes only.',
-    admin: { position: 'sidebar' },
+    admin: { position: 'sidebar', description: slugDescription },
   },
   {
     name: 'translationOf',
@@ -118,7 +118,7 @@ const richText = (required = false): Field[] => [
   lexicalHTMLField({ htmlFieldName: 'html', lexicalFieldName: 'richText' }),
 ]
 
-// Eight general-purpose page blocks, with no decoration knobs.
+// Nine general-purpose page blocks, with no decoration knobs.
 export const blocks: Block[] = [
   {
     slug: 'hero',
@@ -193,6 +193,24 @@ export const blocks: Block[] = [
       { name: 'heading', type: 'text' },
       { name: 'collectionHandle', type: 'text', required: true },
       { name: 'limit', type: 'number', defaultValue: 8, min: 1, max: 24 },
+    ],
+  },
+  {
+    // Shopify owns each collection's title and photo; Payload owns only the short description.
+    slug: 'collectionList',
+    fields: [
+      { name: 'heading', type: 'text' },
+      {
+        name: 'items',
+        type: 'array',
+        required: true,
+        minRows: 1,
+        maxRows: 12,
+        fields: [
+          { name: 'handle', type: 'text', required: true, admin: { description: 'A Shopify collection handle.' } },
+          { name: 'description', type: 'textarea' },
+        ],
+      },
     ],
   },
 ]

@@ -9,7 +9,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 // `payload-document-event` message (sent after every save and autosave).
 
 const HOUR_S = 3600
-const COLLECTIONS = new Set(['pages', 'articles', 'docs'])
+const COLLECTIONS = new Set(['pages', 'articles', 'docs', 'products'])
 
 // Keyed on PAYLOAD_SECRET itself (not Payload's derived key), so the smoke can sign a link too.
 const sign = (collection: string, id: string, exp: number) =>

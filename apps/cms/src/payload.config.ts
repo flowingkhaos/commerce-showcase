@@ -7,7 +7,7 @@ import path from 'path'
 import { buildConfig } from 'payload'
 import { fileURLToPath } from 'url'
 
-import { Articles, Docs, Pages } from './collections/Content'
+import { Articles, Docs, Pages, Products, Site } from './collections/Content'
 import { Domains } from './collections/Domains'
 import { Media } from './collections/Media'
 import { Users } from './collections/Users'
@@ -32,9 +32,9 @@ export default buildConfig({
         { path: '/components/VisitorDoor#VisitorDoor', clientProps: { siteKey: process.env.TURNSTILE_SITE_KEY } },
       ],
     },
-    livePreview: { collections: ['pages', 'articles', 'docs'], ...livePreview },
+    livePreview: { collections: ['pages', 'articles', 'docs', 'products'], ...livePreview },
   },
-  collections: [Domains, Pages, Articles, Docs, Media, Users],
+  collections: [Domains, Pages, Articles, Docs, Products, Site, Media, Users],
   endpoints: [visitorEnter, previewEndpoint],
   // Cloud Run boots after every idle spell, so this sweep runs about daily on top of the door's.
   onInit: (payload) => {

@@ -18,7 +18,7 @@ podman start showcase-cms-db             # Postgres 18 on 127.0.0.1:55433 (first
 bun install && bun run build             # after any code change
 NODE_ENV=production bun run start       # http://localhost:4620
 bun run seed                             # idempotent seed
-PAYLOAD_SECRET=$(grep -m1 '^PAYLOAD_SECRET=' .env | cut -d= -f2-) bun run smoke   # 54 checks
+PAYLOAD_SECRET=$(grep -m1 '^PAYLOAD_SECRET=' .env | cut -d= -f2-) bun run smoke   # 62 checks
 ```
 
 Without `PAYLOAD_SECRET` in its env the smoke skips the signed preview links. It walks the
@@ -67,12 +67,23 @@ never leak, even with `draft=true`. Max `depth` is 2.
 | `pages` | `/api/pages?where[domain.slug][equals]=<domain>&where[locale][equals]=<fr\|en>&depth=1&limit=100` |
 | `articles` | `/api/articles?where[domain.slug][equals]=<domain>&where[locale][equals]=<fr\|en>&sort=-publishedAt` |
 | `docs` | `/api/docs?where[domain.slug][equals]=<domain>&where[locale][equals]=<fr\|en>&sort=order` |
+| `products` | `/api/products?where[domain.slug][equals]=<domain>&where[locale][equals]=<fr\|en>&depth=1&limit=100` |
+| `site` | `/api/site?where[domain.slug][equals]=<domain>&where[locale][equals]=<fr\|en>&depth=0` (one doc) |
 | `domains` | `/api/domains?depth=0` |
 
 Every content doc: `id`, `title`, `slug`, `locale` (`fr` \| `en`), `domain` (object at depth ≥ 1),
 `translationOf` (the other-language doc, or null), `meta { title, description, image }`,
 `updatedAt` (UTC ISO). `(domain, locale, slug)` is unique. A French URL with no French doc is a
 404, never English.
+
+**Products** hold a product's words only; Shopify owns its title, price, stock and images.
+`slug` is the Shopify product handle. Fields: `story[]` (up to 8 `mediaText`, `featureList` or
+`richText` blocks, same shape as on pages), `badges[] { label }` (at most 3), `meta`, plus
+`domain`, `locale`, `translationOf`. No `title`.
+
+**Site** is one doc per `(domain, locale)` (unique): `nav[] { label, url }` (at most 8),
+`footer[] { heading, links[] { label, url } }` (at most 6 columns of 8 links), `footerNote`.
+No drafts: what the operator saves is live.
 
 **Domains seeded:** `store` (OVRLD, kind store), `blog-demo` (blog), `renovation-demo` (Linteau,
 site), `plumbing-demo` (Clapet, site). All `planned` until their site is live.
@@ -89,6 +100,7 @@ site), `plumbing-demo` (Clapet, site). All `planned` until their site is live.
 | `faq` | `heading?`, `items[] { question, answer }` (plain text) |
 | `banner` | `style` (`info` \| `success` \| `warning`), `text`, `link { label?, url? }` |
 | `productGrid` | `heading?`, `collectionHandle` (Shopify), `limit` |
+| `collectionList` | `heading?`, `items[] { handle, description? }` (1–12; `handle` = a Shopify collection handle; Shopify owns the title and photo) |
 
 `links[]`: `{ label, url, style: 'primary' | 'secondary' }`, at most 2. Media: `{ url, alt,
 credit?, width, height, mimeType }`; `url` is absolute on the CMS host (`SERVER_URL`), so add
@@ -115,11 +127,11 @@ multipart (`file` + `_payload={"alt":"…","credit":"…"}`).
 
 ## Live preview (for the sites)
 
-Pages, articles and docs autosave every 3 s, and the admin shows the draft on the real site
+Pages, articles, docs and products autosave every 3 s, and the admin shows the draft on the real site
 beside the form. Each domain opts in by holding its site's address in `domains.url`; without
 one the preview tab does not appear.
 
-1. The admin's iframe opens `<domains.url>/preview?collection=<pages|articles|docs>&id=<id>&exp=<unix s>&sig=<hex>`.
+1. The admin's iframe opens `<domains.url>/preview?collection=<pages|articles|docs|products>&id=<id>&exp=<unix s>&sig=<hex>`.
    The link is signed by this CMS and lives 1–2 h (it changes once an hour, so the frame does
    not reload twice per save).
 2. The site's `GET /preview` copies those four values to
@@ -153,5 +165,4 @@ Working examples: the renovation and plumbing demos (`pages/Preview.tsx` in each
 
 ## Not built yet
 
-The products and webhook-events collections, the `site` global, a `collectionList` block and
-rebuild dispatch.
+The webhook-events collection and rebuild dispatch.

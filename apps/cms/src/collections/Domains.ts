@@ -4,7 +4,7 @@ import { APIError } from 'payload'
 
 import { anyone, isAdmin } from '../fields'
 
-const contentCollections = ['pages', 'articles', 'docs'] as const
+const contentCollections = ['pages', 'articles', 'docs', 'products', 'site'] as const
 
 // The root of all content: one row per website this CMS serves.
 export const Domains: CollectionConfig = {

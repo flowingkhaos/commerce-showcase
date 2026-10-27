@@ -62,32 +62,34 @@ export type SupportedTimezones =
   | 'Pacific/Fiji';
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "LexicalNodes_66E14BF1".
+ * via the `definition` "LexicalNodes_21DCB75E".
  */
-export type LexicalNodes_66E14BF1 =
+export type LexicalNodes_21DCB75E =
   | SerializedTextNode
   | SerializedTabNode
   | SerializedLineBreakNode
-  | SerializedParagraphNode<LexicalNodes_66E14BF1>
+  | SerializedParagraphNode<LexicalNodes_21DCB75E>
   | SerializedHorizontalRuleNode
   | SerializedUploadNode<'media'>
-  | SerializedQuoteNode<LexicalNodes_66E14BF1>
+  | SerializedQuoteNode<LexicalNodes_21DCB75E>
   | SerializedRelationshipNode<
       | 'domains'
       | 'pages'
       | 'articles'
       | 'docs'
+      | 'products'
+      | 'site'
       | 'users'
       | 'payload-kv'
       | 'payload-locked-documents'
       | 'payload-preferences'
       | 'payload-migrations'
     >
-  | SerializedAutoLinkNode<LexicalNodes_66E14BF1, LexicalLinkFields>
-  | SerializedLinkNode<LexicalNodes_66E14BF1, LexicalLinkFields>
-  | SerializedListNode<LexicalNodes_66E14BF1>
-  | SerializedListItemNode<LexicalNodes_66E14BF1>
-  | SerializedHeadingNode<LexicalNodes_66E14BF1>;
+  | SerializedAutoLinkNode<LexicalNodes_21DCB75E, LexicalLinkFields>
+  | SerializedLinkNode<LexicalNodes_21DCB75E, LexicalLinkFields>
+  | SerializedListNode<LexicalNodes_21DCB75E>
+  | SerializedListItemNode<LexicalNodes_21DCB75E>
+  | SerializedHeadingNode<LexicalNodes_21DCB75E>;
 /**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "LexicalNodes_3DE324E4".
@@ -111,6 +113,8 @@ export interface Config {
     pages: Page;
     articles: Article;
     docs: Doc;
+    products: Product;
+    site: Site;
     media: Media;
     users: User;
     'payload-kv': PayloadKv;
@@ -131,6 +135,8 @@ export interface Config {
     pages: PagesSelect<false> | PagesSelect<true>;
     articles: ArticlesSelect<false> | ArticlesSelect<true>;
     docs: DocsSelect<false> | DocsSelect<true>;
+    products: ProductsSelect<false> | ProductsSelect<true>;
+    site: SiteSelect<false> | SiteSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -226,7 +232,7 @@ export interface Domain {
 export interface Page {
   id: number;
   title: string;
-  layout?: (Hero | RichText | MediaText | FeatureList | Cta | Faq | Banner | ProductGrid)[] | null;
+  layout?: (Hero | RichText | MediaText | FeatureList | Cta | Faq | Banner | ProductGrid | CollectionList)[] | null;
   meta?: {
     title?: string | null;
     description?: string | null;
@@ -357,7 +363,7 @@ export interface User {
  * via the `definition` "RichText".
  */
 export interface RichText {
-  richText: LexicalRichText<LexicalNodes_66E14BF1>;
+  richText: LexicalRichText<LexicalNodes_21DCB75E>;
   html?: string | null;
   id?: string | null;
   blockName?: string | null;
@@ -369,7 +375,7 @@ export interface RichText {
  */
 export interface MediaText {
   heading?: string | null;
-  richText?: LexicalRichText<LexicalNodes_66E14BF1> | null;
+  richText?: LexicalRichText<LexicalNodes_21DCB75E> | null;
   html?: string | null;
   image: number | Media;
   imagePosition?: ('right' | 'left') | null;
@@ -460,6 +466,24 @@ export interface ProductGrid {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "CollectionList".
+ */
+export interface CollectionList {
+  heading?: string | null;
+  items: {
+    /**
+     * A Shopify collection handle.
+     */
+    handle: string;
+    description?: string | null;
+    id?: string | null;
+  }[];
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'collectionList';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "articles".
  */
 export interface Article {
@@ -534,6 +558,86 @@ export interface Doc {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "products".
+ */
+export interface Product {
+  id: number;
+  story?: (RichText | MediaText | FeatureList)[] | null;
+  badges?:
+    | {
+        label: string;
+        id?: string | null;
+      }[]
+    | null;
+  meta?: {
+    title?: string | null;
+    description?: string | null;
+    image?: (number | null) | Media;
+  };
+  domain: number | Domain;
+  locale: 'fr' | 'en';
+  /**
+   * The Shopify product handle, exactly as in Shopify.
+   */
+  slug: string;
+  /**
+   * The same document in the other language.
+   */
+  translationOf?: (number | null) | Product;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site".
+ */
+export interface Site {
+  id: number;
+  domain: number | Domain;
+  locale: 'fr' | 'en';
+  nav?:
+    | {
+        label: string;
+        url: string;
+        id?: string | null;
+      }[]
+    | null;
+  footer?:
+    | {
+        heading: string;
+        links?:
+          | {
+              label: string;
+              url: string;
+              id?: string | null;
+            }[]
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  footerNote?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -571,6 +675,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'docs';
         value: number | Doc;
+      } | null)
+    | ({
+        relationTo: 'products';
+        value: number | Product;
+      } | null)
+    | ({
+        relationTo: 'site';
+        value: number | Site;
       } | null)
     | ({
         relationTo: 'media';
@@ -777,6 +889,20 @@ export interface PagesSelect<T extends boolean = true> {
               id?: T;
               blockName?: T;
             };
+        collectionList?:
+          | T
+          | {
+              heading?: T;
+              items?:
+                | T
+                | {
+                    handle?: T;
+                    description?: T;
+                    id?: T;
+                  };
+              id?: T;
+              blockName?: T;
+            };
       };
   meta?:
     | T
@@ -849,6 +975,105 @@ export interface DocsSelect<T extends boolean = true> {
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "products_select".
+ */
+export interface ProductsSelect<T extends boolean = true> {
+  story?:
+    | T
+    | {
+        richText?:
+          | T
+          | {
+              richText?: T;
+              html?: T;
+              id?: T;
+              blockName?: T;
+            };
+        mediaText?:
+          | T
+          | {
+              heading?: T;
+              richText?: T;
+              html?: T;
+              image?: T;
+              imagePosition?: T;
+              id?: T;
+              blockName?: T;
+            };
+        featureList?:
+          | T
+          | {
+              heading?: T;
+              intro?: T;
+              items?:
+                | T
+                | {
+                    title?: T;
+                    text?: T;
+                    id?: T;
+                  };
+              id?: T;
+              blockName?: T;
+            };
+      };
+  badges?:
+    | T
+    | {
+        label?: T;
+        id?: T;
+      };
+  meta?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        image?: T;
+      };
+  domain?: T;
+  locale?: T;
+  slug?: T;
+  translationOf?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site_select".
+ */
+export interface SiteSelect<T extends boolean = true> {
+  domain?: T;
+  locale?: T;
+  nav?:
+    | T
+    | {
+        label?: T;
+        url?: T;
+        id?: T;
+      };
+  footer?:
+    | T
+    | {
+        heading?: T;
+        links?:
+          | T
+          | {
+              label?: T;
+              url?: T;
+              id?: T;
+            };
+        id?: T;
+      };
+  footerNote?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -997,7 +1222,7 @@ export interface CollectionsWidget {
 export interface CollectionQueryWidget {
   data?: {
     title?: string | null;
-    relatedCollection: 'domains' | 'pages' | 'articles' | 'docs' | 'media' | 'users';
+    relatedCollection: 'domains' | 'pages' | 'articles' | 'docs' | 'products' | 'site' | 'media' | 'users';
     where?:
       | {
           [k: string]: unknown;
@@ -1019,7 +1244,8 @@ export interface CollectionQueryWidget {
  */
 export interface ActivityWidget {
   data?: {
-    excludedCollections?: ('domains' | 'pages' | 'articles' | 'docs' | 'media' | 'users')[] | null;
+    excludedCollections?:
+      ('domains' | 'pages' | 'articles' | 'docs' | 'products' | 'site' | 'media' | 'users')[] | null;
   };
   width: 'small' | 'medium' | 'large' | 'x-large' | 'full';
 }
