@@ -1,0 +1,17 @@
+/* The visitor door under the sign-in form (src/components/VisitorDoor.tsx). Payload 4 tokens. */
+.visitor-door {
+  margin-top: var(--spacer-5);
+  padding-top: var(--spacer-4);
+  border-top: 1px solid var(--color-border);
+}
+.visitor-door h3 {
+  margin: 0 0 var(--spacer-2);
+}
+.visitor-door p {
+  margin: 0 0 var(--spacer-3);
+  color: var(--color-text-secondary);
+}
+.visitor-door .btn {
+  width: 100%;
+  margin: var(--spacer-2) 0 0;
+}

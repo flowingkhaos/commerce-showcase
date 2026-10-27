@@ -1,16 +1,29 @@
 import type { CollectionConfig } from 'payload'
 
-import { blocks, contentFields, contentIndexes, isAdmin, meta, publishedOrAdmin } from '../fields'
+import {
+  adminOrOwnDraft,
+  adminOrVisitor,
+  blocks,
+  contentFields,
+  contentIndexes,
+  meta,
+  publishedOrAdmin,
+  visitorSandbox,
+} from '../fields'
 
-const access = { read: publishedOrAdmin, create: isAdmin, update: isAdmin, delete: isAdmin }
+const access = { read: publishedOrAdmin, create: adminOrVisitor, update: adminOrOwnDraft, delete: adminOrOwnDraft }
+const hooks = { beforeChange: [visitorSandbox] }
 const columns = ['title', 'domain', 'locale', 'slug', '_status', 'updatedAt']
+// Autosave every 3 s (architecture § Backend shape): each save reloads the live preview.
+const versions = { drafts: { autosave: { interval: 3000 } } }
 
 // Builder pages: blocks.
 export const Pages: CollectionConfig = {
   slug: 'pages',
   admin: { useAsTitle: 'title', group: 'Content', defaultColumns: columns },
   access,
-  versions: { drafts: true },
+  hooks,
+  versions,
   indexes: contentIndexes,
   fields: [
     { name: 'title', type: 'text', required: true },
@@ -25,7 +38,8 @@ export const Articles: CollectionConfig = {
   slug: 'articles',
   admin: { useAsTitle: 'title', group: 'Content', defaultColumns: columns },
   access,
-  versions: { drafts: true },
+  hooks,
+  versions,
   indexes: contentIndexes,
   defaultSort: '-publishedAt',
   fields: [
@@ -45,7 +59,8 @@ export const Docs: CollectionConfig = {
   slug: 'docs',
   admin: { useAsTitle: 'title', group: 'Content', defaultColumns: columns },
   access,
-  versions: { drafts: true },
+  hooks,
+  versions,
   indexes: contentIndexes,
   defaultSort: 'order',
   fields: [

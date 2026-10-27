@@ -12,6 +12,8 @@ import { Domains } from './collections/Domains'
 import { Media } from './collections/Media'
 import { Users } from './collections/Users'
 import { migrations } from './migrations'
+import { livePreview, previewEndpoint } from './preview'
+import { sweepVisitors, visitorEnter } from './visitor'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -25,8 +27,19 @@ export default buildConfig({
     user: Users.slug,
     importMap: { baseDir: path.resolve(dirname) },
     meta: { titleSuffix: ' · Showcase CMS', robots: 'noindex, nofollow' },
+    components: {
+      afterLogin: [
+        { path: '/components/VisitorDoor#VisitorDoor', clientProps: { siteKey: process.env.TURNSTILE_SITE_KEY } },
+      ],
+    },
+    livePreview: { collections: ['pages', 'articles', 'docs'], ...livePreview },
   },
   collections: [Domains, Pages, Articles, Docs, Media, Users],
+  endpoints: [visitorEnter, previewEndpoint],
+  // Cloud Run boots after every idle spell, so this sweep runs about daily on top of the door's.
+  onInit: (payload) => {
+    sweepVisitors(payload).catch((e) => payload.logger.error(`visitor sweep: ${e}`))
+  },
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET,
   i18n: { supportedLanguages: { en, fr }, fallbackLanguage: 'en' },

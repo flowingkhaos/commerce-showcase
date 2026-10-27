@@ -1,6 +1,8 @@
 // Smoke: the REST contract the demo sites read, plus the access rules. Needs a seeded CMS.
 // Run: bun run smoke [base-url]   (default http://localhost:4620)
 // Writes (API key) clean up after themselves. Credentials come from the seed's creds file.
+// With PAYLOAD_SECRET in the env, it also signs live preview links and opens them.
+import { createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 
@@ -49,8 +51,8 @@ const draftAsk = await get(`/api/pages?where[slug][equals]=brouillon-prive&draft
 check('anonymous draft=true still hides the draft', draftAsk.body.docs?.length === 0, JSON.stringify(draftAsk.body).slice(0, 120))
 
 // Blog and docs.
-const articles = await get('/api/articles?where[domain.slug][equals]=blog-demo&limit=10')
-check('blog-demo: 2 articles (fr + en) with markdown bodies', articles.body.docs?.length === 2 && articles.body.docs.every((a) => a.body.includes('##')))
+const articles = await get('/api/articles?where[domain.slug][equals]=blog-demo&limit=50')
+check('blog-demo: the seed pair, every article with a markdown body', articles.body.docs?.some((a) => a.slug === 'un-seul-endroit-pour-vos-contenus') && articles.body.docs.every((a) => typeof a.body === 'string' && a.body.length > 0))
 const docs = await get('/api/docs?where[domain.slug][equals]=store&where[locale][equals]=en')
 check('store docs: en doc present', docs.body.docs?.[0]?.slug === 'one-cms-many-sites')
 const domains = await get('/api/domains?limit=20&depth=0')
@@ -81,6 +83,58 @@ check('admin login works (PBKDF2 on Node)', login.status === 200 && Boolean(logi
 const admin = await get('/admin/login')
 check('/admin/login serves the admin', admin.status === 200 && admin.body.includes('</html>'), String(admin.status))
 check('noindex header on the admin', admin.headers.get('x-robots-tag')?.includes('noindex'))
+
+// Live preview: the CMS answers a draft only to a link it signed (src/preview.ts).
+const secret = process.env.PAYLOAD_SECRET
+const now = Math.floor(Date.now() / 1000)
+const signed = (collection, id, exp = now + 3600) => {
+  const sig = createHmac('sha256', secret).update(`preview:${collection}:${id}:${exp}`).digest('hex')
+  return `/api/preview?${new URLSearchParams({ collection, id: String(id), exp: String(exp), sig })}`
+}
+const homeId = storeFr.body.docs.find((d) => d.slug === 'home')?.id
+const forged = await get(`/api/preview?collection=pages&id=${homeId}&exp=${now + 3600}&sig=${'0'.repeat(64)}`)
+check('preview: a forged link is refused', forged.status === 403, String(forged.status))
+if (secret) {
+  const opened = await get(signed('pages', homeId))
+  check('preview: a signed link opens the page, no-store', opened.status === 200 && opened.body.id === homeId && opened.headers.get('cache-control') === 'no-store', String(opened.status))
+  check('preview: no authorship users in the answer', !('createdBy' in opened.body) && !('updatedBy' in opened.body))
+  check('preview: an expired link is refused', (await get(signed('pages', homeId, now - 1))).status === 403)
+} else console.log('skip preview: signed links need PAYLOAD_SECRET in the env')
+
+// Visitor door. Production holds the real Turnstile secret, which no script can pass, so only
+// the refusals run there. Locally Cloudflare's always-pass test keys open the whole door.
+const door = (headers = {}) =>
+  fetch(base + '/api/visitor/enter', {
+    method: 'POST',
+    redirect: 'manual',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
+    body: new URLSearchParams({ 'cf-turnstile-response': 'XXXX.DUMMY.TOKEN.XXXX' }),
+  })
+check('door: a cross-site post is refused', (await door({ 'sec-fetch-site': 'cross-site' })).status === 403)
+const entered = await door()
+if (!base.startsWith('http://localhost')) {
+  check('door: a script without a real Turnstile pass is refused', entered.status === 403, String(entered.status))
+} else {
+  const cookie = entered.headers.get('set-cookie')?.split(';')[0] ?? ''
+  check('door: 303 to /admin with a session cookie', entered.status === 303 && entered.headers.get('location') === '/admin' && cookie.startsWith('payload-token='), String(entered.status))
+  const v = { Cookie: cookie, Origin: base } // Payload reads the cookie only with an Origin (CSRF)
+  const me = (await get('/api/users/me', v)).body.user
+  check('door: the session is a generated visitor', me?.role === 'visitor' && me.email.endsWith('@showcase.invalid'))
+  const dom = Object.fromEntries(domains.body.docs.map((d) => [d.slug, d.id]))
+  const draft = { title: 'Visitor smoke', locale: 'fr', slug: 'visitor-smoke', layout: [{ blockType: 'banner', text: 'visitor' }] }
+  check('visitor: cannot write in renovation-demo', (await send('POST', '/api/pages', { ...draft, domain: dom['renovation-demo'] }, v)).status === 403)
+  check('visitor: cannot publish', (await send('POST', '/api/pages', { ...draft, domain: dom['blog-demo'], _status: 'published' }, v)).status === 403)
+  const mine = await send('POST', '/api/pages?draft=true', { ...draft, domain: dom['blog-demo'] }, v)
+  const doc = mine.body?.doc
+  check('visitor: makes a draft in blog-demo, owned by itself', mine.status === 201 && doc?._status === 'draft' && (doc.createdBy?.value?.id ?? doc.createdBy?.value) === me.id, `${mine.status} ${JSON.stringify(mine.body).slice(0, 160)}`)
+  check('visitor: cannot edit the store home', [403, 404].includes((await send('PATCH', `/api/pages/${homeId}`, { title: 'x' }, v)).status))
+  check('visitor: sees only itself in users', (await get('/api/users', v)).body.totalDocs === 1)
+  check('visitor: cannot make itself admin', (await send('PATCH', `/api/users/${me.id}`, { role: 'admin' }, v)).status === 403)
+  check('anonymous: never sees the visitor draft', !(await get(pagesOf('blog-demo', 'fr'))).body.docs.some((d) => d.slug === 'visitor-smoke'))
+  if (secret && doc) check('preview: shows the visitor draft', (await get(signed('pages', doc.id))).body.title === 'Visitor smoke')
+  if (doc) check('visitor: deletes its own draft', (await send('DELETE', `/api/pages/${doc.id}`, null, v)).status === 200)
+  if (me) check('visitor row deletes (admin key)', (await send('DELETE', `/api/users/${me.id}`)).status === 200)
+}
 
 // Rate limit, last: it blocks this IP's sign-ins for a minute. An unknown email never locks
 // the real admin account.

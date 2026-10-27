@@ -1,6 +1,7 @@
-import type { Access, Block, CollectionSlug, Field, FieldAccess } from 'payload'
+import type { Access, Block, CollectionBeforeChangeHook, CollectionSlug, Field, FieldAccess, Where } from 'payload'
 
 import { lexicalHTMLField } from '@payloadcms/richtext-lexical'
+import { APIError } from 'payload'
 
 // Access: every collection declares every operation with one of these.
 const role = (user: unknown) => (user as { role?: string } | null)?.role
@@ -8,8 +9,44 @@ export const isAdmin: Access = ({ req: { user } }) => role(user) === 'admin'
 export const isAdminField: FieldAccess = ({ req: { user } }) => role(user) === 'admin'
 export const anyone: Access = () => true
 // Anonymous REST (the demo sites) sees published documents only; drafts stay in the admin.
+// A visitor also sees its own sandbox drafts, never another visitor's or the operator's.
+// Ownership = Payload 4's own `createdBy` (authorship: server-stamped, never client-writable).
+const published: Where = { _status: { equals: 'published' } }
+export const madeBy = (id: number | string): Where => ({ 'createdBy.value': { equals: id } })
 export const publishedOrAdmin: Access = ({ req: { user } }) =>
-  role(user) === 'admin' || { _status: { equals: 'published' } }
+  role(user) === 'admin' || (role(user) === 'visitor' ? { or: [published, madeBy(user!.id)] } : published)
+export const adminOrVisitor: Access = ({ req: { user } }) => role(user) === 'admin' || role(user) === 'visitor'
+export const adminOrOwnDraft: Access = ({ req: { user } }) =>
+  role(user) === 'admin' || (role(user) === 'visitor' && madeBy(user!.id))
+
+// The visitor door (architecture § Security checks): visitors write drafts in these two sites
+// only (operator, 2026-10-27), never publish, and stay under the caps.
+export const VISITOR_DOMAINS = ['store', 'blog-demo']
+const VISITOR_DOCS = 20
+const relId = (v: unknown) => (v && typeof v === 'object' ? (v as { id: number }).id : (v as number | undefined))
+
+export const visitorSandbox: CollectionBeforeChangeHook = async ({ data, operation, originalDoc, req }) => {
+  if (role(req.user) !== 'visitor') return data
+  if (data._status === 'published') throw new APIError('Visitors save drafts only: publishing is off in this demo.', 403)
+  data._status = 'draft'
+  if (typeof data.title === 'string' && data.title.length > 120) throw new APIError('Title: 120 characters at most.', 400)
+  if (typeof data.body === 'string' && data.body.length > 20_000) throw new APIError('Body: 20,000 characters at most.', 400)
+  const domain = relId(data.domain ?? originalDoc?.domain)
+  if (domain) {
+    const { slug } = await req.payload.findByID({ collection: 'domains', id: domain, depth: 0, req })
+    if (!VISITOR_DOMAINS.includes(slug)) {
+      throw new APIError('Visitors write in the OVRLD store and the blog demo only.', 403)
+    }
+  }
+  if (operation === 'create') {
+    let mine = 0
+    for (const c of ['pages', 'articles', 'docs'] as const) {
+      mine += (await req.payload.count({ collection: c, where: madeBy(req.user!.id), overrideAccess: true, req })).totalDocs
+    }
+    if (mine >= VISITOR_DOCS) throw new APIError(`Visitors keep ${VISITOR_DOCS} drafts at most: delete one first.`, 403)
+  }
+  return data
+}
 
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
@@ -22,6 +59,7 @@ export const contentFields = (collection: CollectionSlug): Field[] => [
     relationTo: 'domains',
     required: true,
     index: true,
+    filterOptions: ({ req }) => role(req.user) !== 'visitor' || { slug: { in: VISITOR_DOMAINS } },
     admin: { position: 'sidebar' },
   },
   {

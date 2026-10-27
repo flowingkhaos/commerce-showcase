@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from 'next/server'
 
-// Per-IP limits per minute (architecture § Security checks): cheap 429s keep a flood inside
-// Cloud Run's free tier. ponytail: in-memory counters, correct while max-instances is 1;
-// a shared store if the CMS ever runs more than one instance.
+// Per-IP limits per minute (architecture § Security checks; the visitor door counts as a
+// sign-in): cheap 429s keep a flood inside Cloud Run's free tier. ponytail: in-memory
+// counters, correct while max-instances is 1; a shared store if the CMS ever runs more than one.
 const WINDOW_MS = 60_000
 const LIMITS = { auth: 10, write: 60, read: 300 } as const
-const AUTH = /^\/api\/users\/(login|forgot-password|reset-password|first-register|unlock)\b/
+const AUTH = /^\/api\/(users\/(login|forgot-password|reset-password|first-register|unlock)|visitor\/enter)\b/
 const hits = new Map<string, { count: number; reset: number }>()
 
 export function proxy(req: NextRequest) {

@@ -2,8 +2,9 @@
 # Deploy the showcase CMS to Google Cloud Run (scale to zero, free tier), from your machine:
 #   bash deploy/cloudrun.sh <gcp-project-id> [--seed]
 # Needs: `gcloud auth login` done, and ~/.config/kos/showcase-cms.prod.env (mode 600)
-# holding DATABASE_URL (the Neon string) and PAYLOAD_SECRET. Idempotent: the first run also
-# creates the registry, the media bucket, the two secrets and their permissions.
+# holding DATABASE_URL (the Neon string), PAYLOAD_SECRET and the visitor door's Turnstile keys
+# (TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY). Idempotent: the first run also creates the
+# registry, the media bucket, the three secrets and their permissions.
 # --seed loads the sample domains and pages once (it overwrites those sample rows if re-run).
 # Admin login + API key: ~/.config/kos/showcase-cms.prod-admin.env (written by the seed, never printed).
 set -euo pipefail
@@ -20,7 +21,9 @@ BUCKET="$PROJECT-media"
 
 # Read one value without sourcing the file (the Neon string contains '&').
 val() { grep -m1 "^$1=" "$ENVFILE" | cut -d= -f2-; }
-[ -n "$(val DATABASE_URL)" ] && [ -n "$(val PAYLOAD_SECRET)" ] || { echo "DATABASE_URL and PAYLOAD_SECRET must be in $ENVFILE"; exit 1; }
+for key in DATABASE_URL PAYLOAD_SECRET TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY; do
+  [ -n "$(val $key)" ] || { echo "$key must be in $ENVFILE"; exit 1; }
+done
 
 gcloud config set project "$PROJECT" --quiet >/dev/null
 NUMBER=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')
@@ -39,7 +42,7 @@ gcloud artifacts repositories describe showcase --location="$REGION" >/dev/null 
 gcloud storage buckets describe "gs://$BUCKET" >/dev/null 2>&1 \
   || gcloud storage buckets create "gs://$BUCKET" --location="$REGION" --uniform-bucket-level-access --public-access-prevention --quiet
 gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" --member="serviceAccount:$RUNTIME_SA" --role=roles/storage.objectAdmin --quiet >/dev/null
-for pair in cms-database-url:DATABASE_URL cms-payload-secret:PAYLOAD_SECRET; do
+for pair in cms-database-url:DATABASE_URL cms-payload-secret:PAYLOAD_SECRET cms-turnstile-secret:TURNSTILE_SECRET_KEY; do
   name=${pair%%:*} key=${pair#*:}
   gcloud secrets describe "$name" >/dev/null 2>&1 \
     || val "$key" | tr -d '\n' | gcloud secrets create "$name" --replication-policy=automatic --data-file=- --quiet
@@ -68,8 +71,8 @@ echo "== deploy"
 gcloud run deploy "$SERVICE" --image="$TAG" --region="$REGION" --port=3000 \
   --min-instances=0 --max-instances=1 --concurrency=80 \
   --cpu=1 --memory=512Mi --timeout=60 --cpu-boost \
-  --set-secrets=DATABASE_URL=cms-database-url:latest,PAYLOAD_SECRET=cms-payload-secret:latest \
-  --set-env-vars="SERVER_URL=$URL,GCS_BUCKET=$BUCKET" --quiet
+  --set-secrets=DATABASE_URL=cms-database-url:latest,PAYLOAD_SECRET=cms-payload-secret:latest,TURNSTILE_SECRET_KEY=cms-turnstile-secret:latest \
+  --set-env-vars="SERVER_URL=$URL,GCS_BUCKET=$BUCKET,TURNSTILE_SITE_KEY=$(val TURNSTILE_SITE_KEY)" --quiet
 
-echo "== smoke $URL"
-SHOWCASE_CMS_CREDS="$ADMINFILE" node scripts/smoke.mjs "$URL"
+echo "== smoke $URL (PAYLOAD_SECRET lets it sign live preview links)"
+PAYLOAD_SECRET=$(val PAYLOAD_SECRET) SHOWCASE_CMS_CREDS="$ADMINFILE" node scripts/smoke.mjs "$URL"

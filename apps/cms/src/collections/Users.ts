@@ -11,9 +11,10 @@ export const Users: CollectionConfig = {
   access: {
     read: ({ req: { user } }) =>
       (user as { role?: string } | null)?.role === 'admin' || (user ? { id: { equals: user.id } } : false),
+    // Only the visitor door (src/visitor.ts) makes users, and only visitors. A visitor cannot
+    // edit its own row: no email (personal data), no password, no API key.
     create: isAdmin,
-    update: ({ req: { user } }) =>
-      (user as { role?: string } | null)?.role === 'admin' || (user ? { id: { equals: user.id } } : false),
+    update: isAdmin,
     delete: isAdmin,
   },
   fields: [
