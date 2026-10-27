@@ -20,6 +20,10 @@ NODE_ENV=production bun run start       # http://localhost:4620
 bun run seed && bun run smoke            # idempotent seed; 38 checks
 ```
 
+`next start` prints a warning that it "does not work with output: standalone"; it still serves
+the app (checked). The Docker image runs `node server.js` from the standalone build instead.
+
+
 - Admin: http://localhost:4620/admin (French or English UI). The seed writes the admin login and
   API key to a file outside the repo, mode 600: `$SHOWCASE_CMS_CREDS`, by default
   `~/.config/kos/showcase-cms.local.env`. The smoke reads the same file.
