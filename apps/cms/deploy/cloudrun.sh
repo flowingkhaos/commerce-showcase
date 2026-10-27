@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy the showcase CMS to Google Cloud Run (scale to zero, free tier), from this workstation:
+# Deploy the showcase CMS to Google Cloud Run (scale to zero, free tier), from your machine:
 #   bash deploy/cloudrun.sh <gcp-project-id> [--seed]
 # Needs: `gcloud auth login` done, and ~/.config/kos/showcase-cms.prod.env (mode 600)
 # holding DATABASE_URL (the Neon string) and PAYLOAD_SECRET. Idempotent: the first run also
@@ -59,7 +59,7 @@ TAG="$REPO/cms:$(git rev-parse --short HEAD)$(git diff --quiet HEAD -- . || echo
 gcloud builds submit --tag="$TAG" --region="$REGION" --machine-type=e2-highcpu-8 --quiet .
 
 echo "== deploy"
-# Public access is a one-time operator step, kept out of this script: the workspace org's
+# Public access is a one-time manual step, kept out of this script: an organization with
 # domain-restricted sharing refuses `allUsers`, so the service skips the invoker check instead:
 #   gcloud run services update showcase-cms --region=us-east5 --no-invoker-iam-check
 # The setting persists across deploys. The admin, drafts and writes still need a login or key.

@@ -20,7 +20,7 @@ export const Pages: CollectionConfig = {
   ],
 }
 
-// Blog posts: markdown bodies (architecture conv. 14), rendered by each site.
+// Blog posts: markdown bodies, rendered by each site.
 export const Articles: CollectionConfig = {
   slug: 'articles',
   admin: { useAsTitle: 'title', group: 'Content', defaultColumns: columns },

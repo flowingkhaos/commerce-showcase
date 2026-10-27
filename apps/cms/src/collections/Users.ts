@@ -6,7 +6,7 @@ export const Users: CollectionConfig = {
   slug: 'users',
   versions: false,
   admin: { useAsTitle: 'email', group: 'Admin', defaultColumns: ['email', 'role'] },
-  // API keys let the demo-building sessions seed their own domain over REST.
+  // API keys let each site's seed script write its own domain over REST.
   auth: { useAPIKey: true, maxLoginAttempts: 5, lockTime: 10 * 60 * 1000 },
   access: {
     read: ({ req: { user } }) =>

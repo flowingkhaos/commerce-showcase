@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [{ source: '/', destination: '/admin', permanent: false }]
   },
-  // The CMS is never indexed (architecture conv. 17).
+  // The CMS is never indexed.
   async headers() {
     return [{ source: '/:path*', headers: [{ key: 'x-robots-tag', value: 'noindex, nofollow' }] }]
   },

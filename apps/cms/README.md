@@ -2,11 +2,11 @@
 
 One Payload 4 (4.0.0-beta.4) CMS that serves every showcase and demo site: the OVRLD store,
 the blog demo, and the renovation and plumbing demos. Every document carries a `domain`, so one
-admin shows what a CMS serving many websites looks like. Shape: OSDocs
-`projects/commerce-showcase/architecture.md` § Backend shape.
+admin shows what a CMS serving many websites looks like.
 
-Runs on **Node + Postgres 18**, never on Workers (the 10-25 spike: admin CPU and PBKDF2 both fail
-on workerd; `raw/research/commerce-showcase-spike-2026-10-25`). Production: **Google Cloud Run**
+Runs on **Node + Postgres 18**, never on Cloudflare Workers: in a test deploy the admin pages used
+far more CPU than Workers allows, and workerd caps PBKDF2 below the iterations Payload's login uses.
+Production: **Google Cloud Run**
 (us-east5, scales to zero, free tier) + **Neon** Postgres (AWS us-east-2) + a **GCS bucket** for
 media. A request to a sleeping CMS waits for a cold start (≈ 6 s measured locally), so sites read it
 with a short timeout and keep their last good copy.
@@ -16,14 +16,16 @@ with a short timeout and keep their last good copy.
 ```sh
 podman start showcase-cms-db             # Postgres 18 on 127.0.0.1:55433 (first time: see below)
 bun install && bun run build             # after any code change
-systemd-run --user --unit=showcase-cms --working-directory="$PWD" \
-  --setenv=NODE_ENV=production "$PWD/node_modules/.bin/next" start --port 4620
+NODE_ENV=production bun run start       # http://localhost:4620
 bun run seed && bun run smoke            # idempotent seed; 38 checks
 ```
 
-- Admin: http://localhost:4620/admin (French or English UI). Login and API key:
-  `~/.config/kos/showcase-cms.local.env` (written by the seed, mode 600).
-- Stop / logs: `systemctl --user stop showcase-cms` · `journalctl --user -u showcase-cms -f`.
+- Admin: http://localhost:4620/admin (French or English UI). The seed writes the admin login and
+  API key to a file outside the repo, mode 600: `$SHOWCASE_CMS_CREDS`, by default
+  `~/.config/kos/showcase-cms.local.env`. The smoke reads the same file.
+- To keep it running in the background on Linux: `systemd-run --user --unit=showcase-cms
+  --working-directory="$PWD" --setenv=NODE_ENV=production "$PWD/node_modules/.bin/next" start --port 4620`
+  (stop: `systemctl --user stop showcase-cms`, logs: `journalctl --user -u showcase-cms -f`).
 - First-time database: `podman run -d --name showcase-cms-db -p 127.0.0.1:55433:5432 -e POSTGRES_USER=showcase -e POSTGRES_PASSWORD=showcase -e POSTGRES_DB=showcase -v showcase-cms-pg:/var/lib/postgresql docker.io/library/postgres:18`, then `cp .env.example .env` and set `PAYLOAD_SECRET`.
 - Schema change: edit a collection → `bun run payload migrate:create <name>` → rebuild →
   restart (the server applies pending migrations on boot). `push` is off everywhere.
@@ -38,9 +40,9 @@ bash deploy/cloudrun.sh <gcp-project-id> --seed   # first time; later runs witho
 Needs `gcloud auth login`, podman, and `~/.config/kos/showcase-cms.prod.env` (mode 600) with
 `DATABASE_URL` (Neon) and `PAYLOAD_SECRET`. The script migrates Neon from here, builds and pushes
 the image, deploys (max 1 instance, 512 MiB, zero when idle) and runs the smoke against the live
-URL. Prod admin login + API key: `~/.config/kos/showcase-cms.prod-admin.env`.
-Live: https://showcase-cms-1065657380974.us-east5.run.app (project `showcase-cms`, 1 CAD budget alert).
-One-time, by the operator: the workspace org refuses `allUsers`, so public access is
+URL. The prod admin login and API key go to `~/.config/kos/showcase-cms.prod-admin.env`.
+Live: https://showcase-cms-1065657380974.us-east5.run.app (a $1 CAD budget alert guards the project).
+One-time step if your Google Cloud organization refuses public (`allUsers`) access:
 `gcloud run services update showcase-cms --region=us-east5 --no-invoker-iam-check`; it persists.
 `deploy/compose.yml` + `Caddyfile` run the same image with its own Postgres on any one VM.
 
@@ -85,7 +87,7 @@ Articles and docs bodies are **markdown** in `body`; render them with your own m
 renderer. Articles also have `excerpt`, `hero` (media), `category`, `publishedAt`. Docs have
 `category`, `order`, `keyword`.
 
-## Write contract (for the sessions building the sites)
+## Write contract (for each site's seed script)
 
 Seed or change your own domain's content with the admin API key:
 

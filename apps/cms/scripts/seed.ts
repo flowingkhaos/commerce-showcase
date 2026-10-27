@@ -1,7 +1,7 @@
 // Seed the showcase CMS: the four site rows, FR + EN samples for the store and the blog, one
 // private draft. Create-only: a row that exists (matched by its natural key) is never touched,
-// so re-running never reverts what a person or a site's session wrote. Run: bun run seed
-// The renovation and plumbing sites write their own pages (their sessions, via the API).
+// so re-running never reverts what a person or a site's script wrote. Run: bun run seed
+// The renovation and plumbing sites write their own pages, via the API.
 //
 // Admin + API key: written to $SHOWCASE_CMS_CREDS (default ~/.config/kos/showcase-cms.local.env),
 // mode 600, never printed.

@@ -28,8 +28,8 @@ const send = async (method, path, data, headers = key) => {
 const pagesOf = (domain, locale) =>
   `/api/pages?where[domain.slug][equals]=${domain}&where[locale][equals]=${locale}&depth=1&limit=100`
 
-// The read the Fresh demos make (DEMO.md § CMS route). Their pages belong to their sessions,
-// so only the shape is checked there; content checks run on the seeded store pages.
+// The read the demo sites make. Their pages are written by the sites themselves, so only the
+// shape is checked there; content checks run on the seeded store pages.
 for (const domain of ['renovation-demo', 'plumbing-demo', 'store']) {
   for (const locale of ['fr', 'en']) {
     const { status, body } = await get(pagesOf(domain, locale))

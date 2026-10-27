@@ -2,7 +2,7 @@ import type { Access, Block, CollectionSlug, Field, FieldAccess } from 'payload'
 
 import { lexicalHTMLField } from '@payloadcms/richtext-lexical'
 
-// Access: every collection declares every operation with one of these (architecture conv. 7).
+// Access: every collection declares every operation with one of these.
 const role = (user: unknown) => (user as { role?: string } | null)?.role
 export const isAdmin: Access = ({ req: { user } }) => role(user) === 'admin'
 export const isAdminField: FieldAccess = ({ req: { user } }) => role(user) === 'admin'
@@ -13,7 +13,7 @@ export const publishedOrAdmin: Access = ({ req: { user } }) =>
 
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
-// The three fields every content doc carries (architecture conv. 2) plus its slug.
+// The three fields every content doc carries, plus its slug.
 // Unique on (domain, locale, slug); a French URL with no French doc is a 404, never English.
 export const contentFields = (collection: CollectionSlug): Field[] => [
   {
@@ -80,7 +80,7 @@ const richText = (required = false): Field[] => [
   lexicalHTMLField({ htmlFieldName: 'html', lexicalFieldName: 'richText' }),
 ]
 
-// Copied in spirit from the KOS block catalogue, minus its decoration knobs.
+// Eight general-purpose page blocks, with no decoration knobs.
 export const blocks: Block[] = [
   {
     slug: 'hero',
