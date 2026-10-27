@@ -1,0 +1,44 @@
+# The showcase CMS on one VM: Postgres 18, the CMS, and Caddy for HTTPS.
+# Run from /opt/showcase-cms: docker compose -p showcase-cms --env-file .env -f app/deploy/compose.yml up -d --build
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: showcase
+      POSTGRES_DB: showcase
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
+    volumes: [pg:/var/lib/postgresql]
+    healthcheck:
+      test: [CMD, pg_isready, -U, showcase]
+      interval: 5s
+      retries: 12
+
+  cms:
+    build: ..
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://showcase:${DB_PASSWORD}@db:5432/showcase
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET:?}
+      SERVER_URL: https://${CMS_HOST:?}
+      SHOWCASE_CMS_ADMIN_EMAIL: ${SHOWCASE_CMS_ADMIN_EMAIL}
+      SHOWCASE_CMS_ADMIN_PASSWORD: ${SHOWCASE_CMS_ADMIN_PASSWORD}
+      SHOWCASE_CMS_API_KEY: ${SHOWCASE_CMS_API_KEY}
+    volumes: [media:/app/media]
+    depends_on:
+      db: { condition: service_healthy }
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ['80:80', '443:443']
+    environment:
+      CMS_HOST: ${CMS_HOST}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+
+volumes:
+  pg:
+  media:
+  caddy:

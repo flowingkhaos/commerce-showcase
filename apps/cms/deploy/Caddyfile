@@ -1,0 +1,8 @@
+# HTTPS for the CMS host (a free Let's Encrypt certificate, renewed by Caddy).
+{$CMS_HOST} {
+	encode zstd gzip
+	request_body {
+		max_size 10MB
+	}
+	reverse_proxy cms:3000
+}

@@ -32,25 +32,32 @@ async function upsert(collection: CollectionSlug, where: Where, data: Record<str
 }
 
 // --- admin user + API key -------------------------------------------------------------
+// On the server the three values come from the environment (the VM's .env) and no file is
+// written; locally they live in the creds file, generated on the first run.
+const fromEnv = Boolean(process.env.SHOWCASE_CMS_ADMIN_PASSWORD && process.env.SHOWCASE_CMS_API_KEY)
 const credsFile = process.env.SHOWCASE_CMS_CREDS || path.join(homedir(), '.config/kos/showcase-cms.local.env')
-const creds = Object.fromEntries(
-  existsSync(credsFile)
-    ? readFileSync(credsFile, 'utf8')
-        .split('\n')
-        .filter((l) => l.includes('='))
-        .map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)])
-    : [],
-)
+const creds: Record<string, string | undefined> = fromEnv
+  ? process.env
+  : Object.fromEntries(
+      existsSync(credsFile)
+        ? readFileSync(credsFile, 'utf8')
+            .split('\n')
+            .filter((l) => l.includes('='))
+            .map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)])
+        : [],
+    )
 const email = creds.SHOWCASE_CMS_ADMIN_EMAIL || 'admin@showcase.local'
 const password = creds.SHOWCASE_CMS_ADMIN_PASSWORD || randomBytes(18).toString('base64url')
 const apiKey = creds.SHOWCASE_CMS_API_KEY || randomUUID()
 await upsert('users', { email: { equals: email } }, { email, password, role: 'admin', enableAPIKey: true, apiKey })
-mkdirSync(path.dirname(credsFile), { recursive: true })
-writeFileSync(
-  credsFile,
-  `# Showcase CMS (local). Written by apps/cms/scripts/seed.ts.\nSHOWCASE_CMS_ADMIN_EMAIL=${email}\nSHOWCASE_CMS_ADMIN_PASSWORD=${password}\nSHOWCASE_CMS_API_KEY=${apiKey}\n`,
-  { mode: 0o600 },
-)
+if (!fromEnv) {
+  mkdirSync(path.dirname(credsFile), { recursive: true })
+  writeFileSync(
+    credsFile,
+    `# Showcase CMS (local). Written by apps/cms/scripts/seed.ts.\nSHOWCASE_CMS_ADMIN_EMAIL=${email}\nSHOWCASE_CMS_ADMIN_PASSWORD=${password}\nSHOWCASE_CMS_API_KEY=${apiKey}\n`,
+    { mode: 0o600 },
+  )
+}
 
 // --- domains ---------------------------------------------------------------------------
 const domain = async (slug: string, name: string, kind: 'blog' | 'site' | 'store') =>
@@ -224,5 +231,5 @@ await upsert(
   true,
 )
 
-payload.logger.info(`Seeded. Admin and API key in ${credsFile}`)
+payload.logger.info(fromEnv ? 'Seeded. Admin and API key from the environment.' : `Seeded. Admin and API key in ${credsFile}`)
 process.exit(0)
