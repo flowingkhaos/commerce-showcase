@@ -3,6 +3,7 @@
 import { localePath, t, type Locale } from '../i18n'
 import { ghost, lowestPrice, price } from '../lib/format'
 import type { Card } from '../lib/shopify'
+import Hud from './Hud'
 import Plate from './Plate.astro'
 
 interface Props {
@@ -12,21 +13,24 @@ interface Props {
   level?: 'h2' | 'h3'
   /** Filter key (product type) for the collection chips. */
   type?: string
+  /** The X-ray callout on the title: where Shopify's data came from. */
+  field?: string
 }
-const { product: p, locale, span, level: H = 'h2', type } = Astro.props
+const { product: p, locale, span, level: H = 'h2', type, field = 'product.title · price' } = Astro.props
 const id = `p-${p.handle}`
 const { lowest, from } = lowestPrice([p])
 const amount = price(lowest, t(locale, 'moneyLocale'), true)
 ---
 <article class:list={['tile t-rel', span]} data-type={type} aria-labelledby={id}>
   <div class="rel__copy" data-owner="Shopify">
-    <H id={id} data-owner="Shopify"><a href={localePath(locale, `/products/${p.handle}`)}>{p.title}</a></H>
+    <H id={id} data-owner="Shopify"><Hud o="Shopify" f={field} /><a href={localePath(locale, `/products/${p.handle}`)}>{p.title}</a></H>
     {p.summary?.value && <p class="spec">{p.summary.value}</p>}
     <p class="price">
       {from && `${t(locale, 'from')} `}<span class="readout readout--sm" data-ghost={ghost(amount)}><span>{amount}</span></span>
     </p>
   </div>
   <figure class="rel__shot fig" data-owner="Shopify">
+    <Hud o="Shopify" f={p.featuredImage ? 'product.images' : 'product.images · none yet'} at="in" />
     <Plate image={p.featuredImage} title={p.title} tag={p.summary?.value} locale={locale} />
   </figure>
 </article>

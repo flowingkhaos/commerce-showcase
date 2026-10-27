@@ -16,6 +16,7 @@ import { t, type Locale } from '../i18n'
 import { cartStore, openCartDrawer } from '../lib/cart'
 import { ghost, price, swatch } from '../lib/format'
 import type { FormProduct } from '../lib/shopify'
+import Hud from './Hud'
 
 type Props = {
   product: FormProduct
@@ -78,12 +79,14 @@ export default function ProductForm({ product, locale, layout, path }: Props) {
 
   const priceLine = (
     <p class="price" data-owner="Shopify">
+      <Hud o="Shopify" f="variant.price" />
       <span class="readout" data-ghost={ghost(amount)}><span>{amount}</span></span>
       {money.currencyCode}
     </p>
   )
   const stockLine = (
     <p class="stock" data-owner="Shopify">
+      <Hud o="Shopify" f="availableForSale" />
       <span class={available ? 'led led--green' : 'led led--yellow'} aria-hidden="true" />
       {available ? t(locale, buy ? 'inStockTest' : 'inStock') : t(locale, 'soldOut')}
     </p>
@@ -146,6 +149,7 @@ export default function ProductForm({ product, locale, layout, path }: Props) {
       <input type="hidden" {...register('merchandiseId', {})} />
       <input type="hidden" {...register('quantity', { value: 1 })} />
       <button {...register('addToCart', {})} class={buy ? 'add add--wide' : 'add'} aria-haspopup="dialog" data-owner="Shopify" disabled={!addable}>
+        <Hud o="Shopify" f="cartLinesAdd" />
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
         {addable ? t(locale, 'addToBag') : v ? t(locale, 'soldOut') : t(locale, 'selectOptions')}
         {pick && <span class="add__pick">{pick}</span>}
@@ -161,14 +165,14 @@ export default function ProductForm({ product, locale, layout, path }: Props) {
       <>
         {priceLine}
         {stockLine}
-        {picker && <div class="variants" data-owner="Shopify">{groups}</div>}
+        {picker && <div class="variants" data-owner="Shopify"><Hud o="Shopify" f="product.variants" />{groups}</div>}
         {form}
       </>
     )
   return (
     <>
       <div class="buyline">{priceLine}{stockLine}</div>
-      {picker && <div class="picks" data-owner="Shopify">{groups}</div>}
+      {picker && <div class="picks" data-owner="Shopify"><Hud o="Shopify" f="product.variants" />{groups}</div>}
       {form}
     </>
   )

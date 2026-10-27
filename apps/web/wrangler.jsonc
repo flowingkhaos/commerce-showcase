@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // Deploys to the clevrstart account. `account_id` is pinned at deploy time (phase 2), from
-  // CLOUDFLARE_ACCOUNT_ID, so no account value lives in the public repo.
+  // Deploys to the clevrstart account. There is no `account_id` here on purpose: wrangler reads
+  // CLOUDFLARE_ACCOUNT_ID from the environment, so no account value lives in the public repo.
   "name": "commerce-showcase",
   // Shopify routes run before Astro's router; everything else is a prerendered asset.
   "main": "./src/worker.ts",
@@ -12,4 +12,7 @@
     "directory": "./dist/client",
   },
   "observability": { "enabled": true },
+  // Cart writes and live previews: 30 requests a minute per IP and route (src/worker.ts).
+  "ratelimits": [{ "name": "LIMITER", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } }],
+  // Secrets, set with `wrangler secret put`: PUBLIC_STORE_DOMAIN, PRIVATE_STOREFRONT_API_TOKEN.
 }

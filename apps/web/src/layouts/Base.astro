@@ -5,6 +5,7 @@
 import { getShopifyScriptTags } from '@shopify/hydrogen'
 import { PUBLIC_STORE_DOMAIN } from 'astro:env/server'
 import CartDrawer, { BagButton } from '../components/Bag'
+import Hud, { type Owner } from '../components/Hud'
 import { localePath, t, type Locale } from '../i18n'
 import { CMS_ADMIN } from '../lib/cms'
 import { marketFor } from '../lib/market'
@@ -19,8 +20,10 @@ interface Props {
   paths: Record<Locale, string>
   noindex?: boolean
   cartInitial?: Parameters<typeof CartDrawer>[0]['initialData']
+  /** The docs use their own reading layout instead of the wall. */
+  mainClass?: string
 }
-const { locale, title, description, paths, noindex = false, cartInitial } = Astro.props
+const { locale, title, description, paths, noindex = false, cartInitial, mainClass = 'wrap wall' } = Astro.props
 const other: Locale = locale === 'fr' ? 'en' : 'fr'
 const [banks, shopId] = await Promise.all([getBanks(locale), getShopId()])
 const { country, language } = marketFor(locale)
@@ -38,7 +41,21 @@ const nav = [
   { href: L('/collections/apparel'), label: t(locale, 'navApparel') },
   { href: L('/collections/equipment'), label: t(locale, 'navEquipment') },
   { href: `${L('/')}#collections`, label: t(locale, 'navCollections') },
+  { href: L('/how-it-works'), label: t(locale, 'navHow') },
+  { href: L('/docs'), label: t(locale, 'navDocs') },
 ]
+
+// The X-ray legend counts the callouts on this page. The body renders first so the count is in
+// the HTML: the switch is a checkbox, and the legend works without JavaScript.
+const body = await Astro.slots.render('default')
+const OWNERS: Owner[] = ['Payload', 'Shopify', 'Code']
+const CHROME: Record<Owner, number> = { Payload: 0, Shopify: 1, Code: 2 } // nav, bag count, footer
+const counts = OWNERS.map((o) => ({
+  o,
+  n: CHROME[o] + (body.match(new RegExp(`class="hud[^"]*" aria-hidden="true"><b>${o}</b>`, 'g'))?.length ?? 0),
+}))
+const total = counts.reduce((a, c) => a + c.n, 0)
+const pad = (n: number) => String(n).padStart(2, '0')
 ---
 <!doctype html>
 <html lang={t(locale, 'htmlLang')} class="dark">
@@ -73,13 +90,20 @@ const nav = [
       <aside class="showcase" aria-label={t(locale, 'showcaseLabel')}>
         <div class="wrap showcase__in">
           <div class="showcase__slot">
-            <p class="showcase__note" data-owner="Code"><b>{t(locale, 'showcaseLead')}</b>{t(locale, 'showcaseNote')}</p>
+            <p class="showcase__note"><b>{t(locale, 'showcaseLead')}</b>{t(locale, 'showcaseNote')}</p>
+            <p class="legend">
+              <span class="sr-only">{t(locale, 'xrayLegend')}</span>
+              <span class="legend__bar" aria-hidden="true">{counts.flatMap(({ o, n }) => Array.from({ length: n }, () => <span data-owner={o} />))}</span>
+              {counts.map(({ o, n }) => <span class="legend__key" data-owner={o}>{o === 'Code' ? t(locale, 'storeCode') : o} <b>{pad(n)}</b></span>)}
+              <span class="legend__all">{t(locale, 'fields', { n: total })}</span>
+            </p>
           </div>
           <div class="showcase__acts">
             <a class="sc-cms" href={CMS_ADMIN}>
               {t(locale, 'openCms')}
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" /></svg>
             </a>
+            <label class="xray"><input type="checkbox" id="xray" role="switch" /><span class="led" aria-hidden="true"></span>{t(locale, 'xray')}<span class="xray__state" aria-hidden="true"></span></label>
           </div>
         </div>
       </aside>
@@ -88,6 +112,7 @@ const nav = [
         <nav class="nav wrap" aria-label={t(locale, 'navLabel')}>
           <a class="wordmark" href={L('/')} aria-label={t(locale, 'homeLabel')}>OVRLD</a>
           <div class="nav__group" data-owner="Code">
+            <Hud o="Code" f="nav labels · Payload's site global later" at="below" />
             <ul class="nav__links">
               {nav.map((n) => <li><a href={n.href}><span class="led" aria-hidden="true" />{n.label}</a></li>)}
             </ul>
@@ -129,17 +154,19 @@ const nav = [
         </nav>
       </header>
 
-      <main id="main" class="wrap wall">
-        <slot />
+      <main id="main" class={mainClass}>
+        <Fragment set:html={body} />
       </main>
 
       <footer class="wrap wall foot">
         <div class="row">
           <div class="tile t-util s12">
             <div class="util__go" data-owner="Code">
+              <Hud o="Code" f="footer labels · Payload's site global later" />
               <a class="foot__mark" href={L('/')} aria-label={t(locale, 'homeLabel')}>OVRLD</a>
               <div class="acts">
                 <a class="cta" href={CMS_ADMIN}>{t(locale, 'openCms')} <small>{t(locale, 'openCmsSub')}</small></a>
+                <a class="ghost" href={L('/docs')}><span class="led" aria-hidden="true"></span>{t(locale, 'readDocs')}</a>
               </div>
             </div>
             <div class="foot__cols" data-owner="Code">
@@ -157,7 +184,12 @@ const nav = [
               }
               <nav aria-label={t(locale, 'footShowcase')}>
                 <h2>{t(locale, 'footShowcase')}</h2>
-                <ul><li><a href={CMS_ADMIN}>{t(locale, 'openCms')}</a></li></ul>
+                <ul>
+                  <li><a href={CMS_ADMIN}>{t(locale, 'openCms')}</a></li>
+                  <li><a href={L('/how-it-works')}>{t(locale, 'footHow')}</a></li>
+                  <li><a href={L('/docs')}>{t(locale, 'navDocs')}</a></li>
+                  <li><label for="xray">{t(locale, 'xray')}</label></li>
+                </ul>
               </nav>
               <nav aria-label={t(locale, 'footStore')}>
                 <h2>{t(locale, 'footStore')}</h2>
@@ -185,6 +217,16 @@ const nav = [
       <CartDrawer client:load locale={locale} initialData={cartInitial} />
     </div>
 
+    <script is:inline>
+      // X-ray stays on across pages for this visitor (works without it: the switch is a checkbox).
+      ;(() => {
+        const x = document.getElementById('xray')
+        try {
+          x.checked = localStorage.getItem('ovrld-xray') === 'on'
+          x.addEventListener('change', () => localStorage.setItem('ovrld-xray', x.checked ? 'on' : 'off'))
+        } catch {}
+      })()
+    </script>
     <script is:inline>
       // The mode toggle: html.dark is the dark room; the label names what a press does.
       ;(() => {

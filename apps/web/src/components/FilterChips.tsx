@@ -2,6 +2,7 @@
 // by product type. The grid stays server-rendered; without JS every product shows.
 import { useEffect, useState } from 'preact/hooks'
 import { t, type Locale } from '../i18n'
+import Hud from './Hud'
 
 type Chip = { key: string; label: string; count: number }
 
@@ -19,6 +20,7 @@ export default function FilterChips({ chips, total, gridId, labelId, locale }: {
   return (
     <>
       <div class="chips" role="group" aria-labelledby={labelId} data-owner="Shopify">
+        <Hud o="Shopify" f="product type · sub-collection titles" />
         <button class="chip" type="button" aria-pressed={on === 'all'} onClick={() => setOn('all')}>
           <span class="led" aria-hidden="true" />{t(locale, 'all')} <b>{total}</b>
         </button>
@@ -29,6 +31,7 @@ export default function FilterChips({ chips, total, gridId, labelId, locale }: {
         ))}
       </div>
       <p class="chips__shown" role="status" data-owner="Code">
+        <Hud o="Code" f="filter state" at="end" />
         {t(locale, 'shown', { n: current?.count ?? total, total })}
         {current ? ` · ${current.label}` : ''}
       </p>

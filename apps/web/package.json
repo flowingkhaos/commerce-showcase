@@ -9,7 +9,8 @@
     "build": "astro build",
     "preview": "wrangler dev",
     "typecheck": "astro check && hydrogen gql check",
-    "dev-vars": "node scripts/dev-vars.mjs"
+    "dev-vars": "node scripts/dev-vars.mjs",
+    "deploy": "astro build && wrangler deploy"
   },
   "dependencies": {
     "@astrojs/cloudflare": "14.4.2",
@@ -17,11 +18,13 @@
     "@nanostores/preact": "1.1.1",
     "@shopify/hydrogen": "2026.10.2",
     "astro": "7.4.2",
+    "marked": "18.1.2",
     "nanostores": "1.5.5",
     "preact": "11.0.2"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.12",
+    "@types/node": "24.12.3",
     "typescript": "6.0.3",
     "wrangler": "4.154.0"
   },

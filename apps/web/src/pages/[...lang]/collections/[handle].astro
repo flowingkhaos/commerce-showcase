@@ -4,7 +4,8 @@
 import Acts from '../../../components/Acts.astro'
 import FilterChips from '../../../components/FilterChips'
 import Grid from '../../../components/Grid.astro'
-import { localeFromParam, t } from '../../../i18n'
+import Hud from '../../../components/Hud'
+import { localeFromParam, localePath, t } from '../../../i18n'
 import Base from '../../../layouts/Base.astro'
 import { CMS_ADMIN } from '../../../lib/cms'
 import { getCollection, getCollections } from '../../../lib/shopify'
@@ -41,9 +42,10 @@ const n = products.length
   <section class="row" aria-labelledby="col-h">
     <div class="tile t-colhead s12">
       <div class="beams" aria-hidden="true"><div class="beams__sweep"></div></div>
-      <h1 id="col-h" data-owner="Shopify">{collection.title}</h1>
-      <p class="spec colhead__n" data-owner="Shopify">{n === 1 ? t(locale, 'colCountOne') : t(locale, 'colCount', { n })}</p>
-      <Acts links={[{ label: t(locale, 'openCms'), sub: t(locale, 'openCmsSub'), url: CMS_ADMIN, style: 'primary' }]} owner="Code" />
+      <h1 id="col-h" data-owner="Shopify"><Hud o="Shopify" f="collection.title" />{collection.title}</h1>
+      <p class="spec colhead__n" data-owner="Shopify"><Hud o="Shopify" f="collection.products" />{n === 1 ? t(locale, 'colCountOne') : t(locale, 'colCount', { n })}</p>
+      <Acts links={[{ label: t(locale, 'openCms'), sub: t(locale, 'openCmsSub'), url: CMS_ADMIN, style: 'primary' }]} owner="Code" field="showcase links" />
+      <div class="hudband"><p data-owner="Code"><b>Code</b><span>{localePath(locale, `/collections/${handle}`)}</span><span>{t(locale, 'routeWebhook')}</span></p></div>
     </div>
   </section>
 

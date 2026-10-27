@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'preact/hooks'
 import { localePath, t, type Locale } from '../i18n'
 import { $cart, CART_DRAWER_ID, cartStore, closeCartDrawer, openCartDrawer, register, submitCart } from '../lib/cart'
 import { ghost, price, shopifyImageUrl } from '../lib/format'
+import Hud from './Hud'
 
 type InitialData = Parameters<typeof cartStore>[0]
 
@@ -45,6 +46,7 @@ export function BagButton({ locale }: { locale: Locale }) {
     >
       {t(locale, 'bag')}{' '}
       <span class="bag__count" data-owner="Shopify">
+        <Hud o="Shopify" f="cart.totalQuantity" at="below-end" />
         <span aria-hidden="true">{pad(n)}</span>
         <span class="sr-only">, {countText(locale, n)}</span>
       </span>

@@ -1,0 +1,223 @@
+---
+// The owner's manual (R3bManualDocs board): the chapters in a quiet sidebar, the article in a
+// 68ch column with its contents beside it, previous and next at the foot. The docs index is the
+// same layout with a list in place of the article. Used by /docs and by /preview for drafts.
+import { localePath, t, type Locale } from '../i18n'
+import { CMS_URL, type Doc } from '../lib/cms'
+import { renderDoc } from '../lib/markdown'
+import Hud from './Hud'
+
+interface Props {
+  locale: Locale
+  docs: Doc[]
+  /** null renders the index. */
+  doc?: Doc | null
+  /** The same doc in the other language, if Payload has one. */
+  other?: Doc | null
+}
+const { locale, docs, doc = null, other = null } = Astro.props
+const href = (d: Pick<Doc, 'slug'>, l: Locale = locale) => localePath(l, `/docs/${d.slug}`)
+
+// Chapters are categories, in the order their first doc appears (docs come sorted by `order`).
+const chapters: { name: string; docs: Doc[] }[] = []
+for (const d of docs) {
+  const name = d.category || t(locale, 'uncategorised')
+  const ch = chapters.find((c) => c.name === name) ?? chapters[chapters.push({ name, docs: [] }) - 1]!
+  ch.docs.push(d)
+}
+const chapterOf = (d: Doc) => chapters.findIndex((c) => c.docs.some((x) => x.id === d.id))
+const at = doc ? docs.findIndex((d) => d.id === doc.id) : -1
+const prev = at > 0 ? docs[at - 1] : undefined
+const next = at >= 0 && at < docs.length - 1 ? docs[at + 1] : undefined
+const chap = doc ? chapterOf(doc) : -1
+const current = chap >= 0 ? `${chap + 1} · ${chapters[chap]!.name}` : doc?.category ?? t(locale, 'manual')
+
+const body = doc ? renderDoc(doc.body ?? '', t(locale, 'copy')) : null
+const scope = body?.sections.map((_, i) => `--r${i + 1}`).join(', ')
+const chev = '<path d="M4 6l4 4 4-4"></path>'
+const copyLabels = {
+  copy: t(locale, 'copy'),
+  copied: t(locale, 'copied'),
+  failed: t(locale, 'copyFailed'),
+  said: t(locale, 'copiedSaid'),
+  failSaid: t(locale, 'copyFailSaid'),
+}
+---
+<div class="docs" style={scope ? `timeline-scope: ${scope}` : undefined}>
+  <div class="side-col">
+    <details class="side" open>
+      <summary>
+        <span class="sum__l">{t(locale, 'manual')}</span><span class="sum__cur">{current}</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={chev} />
+      </summary>
+      <nav class="side__nav" aria-label={t(locale, 'manual')} data-owner="Payload">
+        <Hud o="Payload" f="docs · title, category, order" />
+        <p class="side__title"><a href={localePath(locale, '/docs')}>{t(locale, 'manualTitle')}</a></p>
+        <p class="side__count">{t(locale, 'docsCount', { n: docs.length, c: chapters.length })}</p>
+        {
+          chapters.map((c, i) => (
+            <>
+              <p class="side__chap" id={`d-ch${i + 1}`}><span class="side__n">{i + 1}</span>{c.name}</p>
+              <ul class="side-links" aria-labelledby={`d-ch${i + 1}`}>
+                {c.docs.map((d) => (
+                  <li><a href={href(d)} aria-current={d.id === doc?.id ? 'page' : undefined}><span class="led" aria-hidden="true" />{d.title}</a></li>
+                ))}
+              </ul>
+            </>
+          ))
+        }
+        <p class="side__foot"><span>{t(locale, 'sideFoot')}</span><a href={`${CMS_URL}/admin/collections/docs`}>{t(locale, 'openDocs')}</a></p>
+      </nav>
+    </details>
+  </div>
+
+  {
+    !doc || !body ? (
+      <section class="doc dindex" aria-labelledby="dindex-h">
+        <h1 id="dindex-h">{t(locale, 'manualTitle')}</h1>
+        <p class="dindex__lede">{t(locale, 'docsLede')}</p>
+        {docs.length === 0 && <p class="dindex__empty">{t(locale, 'docsEmpty')}</p>}
+        {chapters.map((c, i) => (
+          <>
+            <h2 class="dindex__chap">{i + 1} · {c.name}</h2>
+            <ul class="dindex__list" data-owner="Payload">
+              {c.docs.map((d) => (
+                <li>
+                  <a href={href(d)}>
+                    <span class="dindex__t">{d.title}</span>
+                    <span class="dindex__m">{t(locale, 'updated', { date: d.updatedAt.slice(0, 10) })}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </>
+        ))}
+      </section>
+    ) : (
+      <article class="doc" id="doc" aria-labelledby="doc-h">
+        <nav class="crumbs" aria-label={t(locale, 'breadcrumb')}>
+          <ol>
+            <li><a href={localePath(locale, '/docs')}>{t(locale, 'manual')}</a></li>
+            <li><span>{current}</span></li>
+            <li><span aria-current="page">{doc.title}</span></li>
+          </ol>
+        </nav>
+
+        {doc.meta?.image ? (
+          <header class="opener">
+            <figure class="film"><img src={doc.meta.image.url} alt={doc.meta.image.alt} /></figure>
+            {doc.meta.image.credit && <p class="opener__cap" data-owner="Payload">{doc.meta.image.credit}</p>}
+            <h1 id="doc-h" data-owner="Payload"><Hud o="Payload" f="docs.title" />{doc.title}</h1>
+          </header>
+        ) : (
+          <h1 id="doc-h" class="doc__h" data-owner="Payload"><Hud o="Payload" f="docs.title" />{doc.title}</h1>
+        )}
+
+        <div class="doc__meta">
+          <p class="doc__stamp">
+            <span>{t(locale, 'updated', { date: doc.updatedAt.slice(0, 10) })}</span>
+            <span>{t(locale, 'minRead', { n: body.minutes })}</span>
+          </p>
+          <div class="dlang" role="group" aria-label={t(locale, 'thisPageIn')} data-owner="Payload">
+            <Hud o="Payload" f="translationOf" />
+            {(['en', 'fr'] as const).map((l) =>
+              l === locale ? (
+                <a href={href(doc)} lang={l} aria-current="page"><span class="led" aria-hidden="true" />{l.toUpperCase()}</a>
+              ) : other ? (
+                <a href={href(other, l)} lang={l} hreflang={l}><span class="led" aria-hidden="true" />{l.toUpperCase()}</a>
+              ) : (
+                // No translation: shown, not linked, so it never leads to a 404 (board state).
+                <span class="dlang__off" lang={l} aria-disabled="true" title={t(locale, 'noOther')}>
+                  <span class="led" aria-hidden="true" />{l.toUpperCase()}<span class="sr-only">, {t(locale, 'noOther')}</span>
+                </span>
+              ),
+            )}
+          </div>
+          <a class="act" href={`${CMS_URL}/admin/collections/docs/${doc.id}`}>
+            {t(locale, 'openInCms')}
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" /></svg>
+          </a>
+        </div>
+
+        {body.sections.length > 0 && (
+          <details class="toc" open>
+            <summary>
+              <span class="sum__l">{t(locale, 'onThisPage')}</span><span class="toc__count">{t(locale, 'sectionsCount', { n: body.sections.length })}</span>
+              <svg class="chev" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={chev} />
+            </summary>
+            <nav class="toc__nav" aria-label={t(locale, 'onThisPage')} data-owner="Code">
+              <Hud o="Code" f="contents, from the ## headings" />
+              <p class="toc__h" aria-hidden="true">{t(locale, 'onThisPage')}</p>
+              <ol class="toc__list">
+                {body.sections.map((s, i) => (
+                  <li style={`--tl: --r${i + 1}`}><a href={`#${s.id}`}><span class="led" aria-hidden="true" /><span class="toc__n">{i + 1}</span>{s.title}</a></li>
+                ))}
+              </ol>
+              <a class="toc__top" href="#doc-h">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4" /></svg>
+                {t(locale, 'backTop')}
+              </a>
+            </nav>
+          </details>
+        )}
+
+        <div class="prose" data-owner="Payload">
+          <Hud o="Payload" f="docs.body · markdown" />
+          <Fragment set:html={body.intro} />
+          {body.sections.map((s, i) => (
+            <section id={s.id} aria-labelledby={`${s.id}-h`} style={`view-timeline-name: --r${i + 1}`}>
+              <h2 id={`${s.id}-h`}><span class="h-n" aria-hidden="true"><span>{i + 1}</span></span>{s.title}</h2>
+              <Fragment set:html={s.html} />
+            </section>
+          ))}
+          {(prev || next) && (
+            <nav class="pager" aria-label={t(locale, 'moreInManual')}>
+              {prev ? (
+                <a class="prev" href={href(prev)} rel="prev">
+                  <span class="pager__dir"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8H3M7 4L3 8l4 4" /></svg>{t(locale, 'previous')}</span>
+                  <span class="pager__t">{prev.title}</span>
+                  <span class="pager__c">{chapterOf(prev) + 1} · {chapters[chapterOf(prev)]!.name}</span>
+                </a>
+              ) : <span />}
+              {next && (
+                <a class="next" href={href(next)} rel="next">
+                  <span class="pager__dir">{t(locale, 'next')}<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" /></svg></span>
+                  <span class="pager__t">{next.title}</span>
+                  <span class="pager__c">{chapterOf(next) + 1} · {chapters[chapterOf(next)]!.name}</span>
+                </a>
+              )}
+            </nav>
+          )}
+        </div>
+        <p class="sr-only" aria-live="polite" id="copy-said"></p>
+      </article>
+    )
+  }
+</div>
+
+<script is:inline define:vars={{ copyLabels }}>
+  // Code blocks: the copy button appears only when a script can run it (board states: at rest,
+  // copied, clipboard refused).
+  for (const b of document.querySelectorAll('.screen .copy')) {
+    b.hidden = false
+    b.addEventListener('click', async () => {
+      const label = b.querySelector('.copy__t')
+      const said = document.getElementById('copy-said')
+      try {
+        await navigator.clipboard.writeText(b.closest('.screen').querySelector('code').textContent)
+        b.className = 'copy is-done'
+        label.textContent = copyLabels.copied
+        if (said) said.textContent = copyLabels.said
+      } catch {
+        b.className = 'copy is-fail'
+        label.textContent = copyLabels.failed
+        if (said) said.textContent = copyLabels.failSaid
+      }
+      setTimeout(() => {
+        b.className = 'copy'
+        label.textContent = copyLabels.copy
+        if (said) said.textContent = ''
+      }, 2400)
+    })
+  }
+</script>

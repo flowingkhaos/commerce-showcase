@@ -3,6 +3,7 @@
 // until phase 2's switch), specs from Shopify metafields, related products from Shopify's
 // recommendations. Payload's product story waits for the CMS `products` collection.
 import Acts from '../../../components/Acts.astro'
+import Hud from '../../../components/Hud'
 import Plate from '../../../components/Plate.astro'
 import ProductForm from '../../../components/ProductForm'
 import ProductTile from '../../../components/ProductTile.astro'
@@ -43,6 +44,7 @@ const related = productRecommendations?.slice(0, 3) ?? []
   <section class="row" aria-labelledby="pdp-h">
     <div class="tile t-gal s7">
       <figure class="fig" data-owner="Shopify">
+        <Hud o="Shopify" f={main ? 'product.images' : 'product.images · none yet'} at="in" />
         <Plate image={main} title={product.title} tag={product.summary?.value} locale={locale} width={900} eager />
       </figure>
       {
@@ -56,19 +58,21 @@ const related = productRecommendations?.slice(0, 3) ?? []
       }
     </div>
     <div class="tile t-buy s5">
-      <h1 id="pdp-h" data-owner="Shopify">{product.title}</h1>
+      <h1 id="pdp-h" data-owner="Shopify"><Hud o="Shopify" f="product.title" />{product.title}</h1>
       <ProductForm client:load product={formProduct(product)} locale={locale} layout="buy" path={path} />
+      <div class="hudband"><p data-owner="Code"><b>Code</b><span>{path}</span><span>{t(locale, 'routeWebhook')}</span></p></div>
     </div>
   </section>
 
   <section class="row" aria-labelledby="xs-h">
     <div class="tile t-xs s12">
-      <h2 id="xs-h" data-owner="Code">{t(locale, 'xsHeading')}</h2>
+      <h2 id="xs-h" data-owner="Code"><Hud o="Code" f="x-ray strip" />{t(locale, 'xsHeading')}</h2>
       <ul class="xs__keys">
         <li data-k="Shopify"><b>Shopify</b>{t(locale, 'xsShopify')}</li>
         <li data-k="Payload"><b>Payload</b>{t(locale, 'xsPayload')}</li>
         <li data-k="Code"><b>{t(locale, 'storeCode')}</b>{t(locale, 'xsCode')}</li>
       </ul>
+      <label class="xray-big" for="xray"><span class="led" aria-hidden="true"></span><span class="xb-off">{t(locale, 'xrayTurnOn')}</span><span class="xb-on">{t(locale, 'xrayTurnOff')}</span></label>
     </div>
   </section>
 
@@ -76,6 +80,7 @@ const related = productRecommendations?.slice(0, 3) ?? []
     <div class="tile t-specs s12">
       <h2 id="specs-h">{t(locale, 'specs')}</h2>
       <div data-owner="Shopify">
+        <Hud o="Shopify" f="product.metafields · specs" />
         <dl class="specs">
           {specs.length === 0 && product.summary?.value && <div><dt>{t(locale, 'specSummary')}</dt><dd>{product.summary.value}</dd></div>}
           {
@@ -107,12 +112,19 @@ const related = productRecommendations?.slice(0, 3) ?? []
 
   <section class="row" aria-labelledby="rel-h">
     <h2 id="rel-h" class="sr-only">{t(locale, 'related')}</h2>
-    {related.map((p) => <ProductTile product={p} locale={locale} span="s6" level="h3" />)}
+    {related.map((p) => <ProductTile product={p} locale={locale} span="s6" level="h3" field="productRecommendations" />)}
     <div class="tile t-how s6">
       <div class="beams" aria-hidden="true"><div class="beams__sweep"></div></div>
-      <h2 id="how-h" data-owner="Code">{t(locale, 'howHeading')}</h2>
+      <h2 id="how-h" data-owner="Code"><Hud o="Code" f="how-it-works link" />{t(locale, 'howHeading')}</h2>
       <p>{t(locale, 'howText')}</p>
-      <Acts links={[{ label: t(locale, 'openCms'), sub: t(locale, 'openCmsSub'), url: CMS_ADMIN, style: 'primary' }]} owner="Code" />
+      <Acts
+        links={[
+          { label: t(locale, 'openCms'), sub: t(locale, 'openCmsSub'), url: CMS_ADMIN, style: 'primary' },
+          { label: t(locale, 'footHow'), url: localePath(locale, '/how-it-works'), style: 'secondary' },
+        ]}
+        owner="Code"
+        field="showcase links"
+      />
     </div>
   </section>
 </Base>

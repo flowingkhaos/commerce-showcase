@@ -1,0 +1,29 @@
+---
+// One doc. Each language is its own Payload doc; a French URL exists only for a French doc.
+import DocView from '../../../components/DocView.astro'
+import { localeFromParam, localePath } from '../../../i18n'
+import Base from '../../../layouts/Base.astro'
+import { counterpart, getDocs } from '../../../lib/cms'
+
+export async function getStaticPaths() {
+  const [en, fr] = await Promise.all([getDocs('en'), getDocs('fr')])
+  return [
+    ...en.map((d) => ({ params: { lang: undefined, slug: d.slug } })),
+    ...fr.map((d) => ({ params: { lang: 'fr', slug: d.slug } })),
+  ]
+}
+
+const locale = localeFromParam(Astro.params.lang)!
+const otherLocale = locale === 'fr' ? 'en' : 'fr'
+const [docs, others] = await Promise.all([getDocs(locale), getDocs(otherLocale)])
+const doc = docs.find((d) => d.slug === Astro.params.slug)!
+const other = counterpart(doc, others)
+// The language switch goes to the translation, or to the other manual's index when there is none.
+const paths = {
+  [locale]: localePath(locale, `/docs/${doc.slug}`),
+  [otherLocale]: other ? localePath(otherLocale, `/docs/${other.slug}`) : localePath(otherLocale, '/docs'),
+} as Record<'en' | 'fr', string>
+---
+<Base locale={locale} title={`${doc.meta?.title ?? doc.title} — OVRLD`} description={doc.meta?.description} paths={paths} mainClass="wrap docs-frame">
+  <DocView locale={locale} docs={docs} doc={doc} other={other} />
+</Base>

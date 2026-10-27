@@ -1,0 +1,160 @@
+---
+// How it works (R4 How-it-works board): the patch diagram and the stack (store code, facts from
+// the architecture record and its 2026-10-27 Cloud Run amendment), the domains read from the
+// CMS at build, and the webhook log as demo rows until the CMS has a webhook-events collection.
+import Acts from '../../components/Acts.astro'
+import Hud from '../../components/Hud'
+import { localeFromParam, localePath, t } from '../../i18n'
+import Base from '../../layouts/Base.astro'
+import { CMS_ADMIN, CMS_URL, getDomains } from '../../lib/cms'
+
+export const getStaticPaths = () => [{ params: { lang: undefined } }, { params: { lang: 'fr' } }]
+
+const locale = localeFromParam(Astro.params.lang)!
+const domains = await getDomains()
+if (!domains.length) throw new Error('CMS: no domains')
+// This store first, then the CMS's order.
+domains.sort((a, b) => Number(b.slug === 'store') - Number(a.slug === 'store'))
+
+const STACK = [
+  ['Astro 7.4.2', 'stackAstro'],
+  ['@astrojs/cloudflare 14.4.2', 'stackCf'],
+  ['Payload 4.0.0-beta.4', 'stackPayload'],
+  ['Google Cloud Run', 'stackRun'],
+  ['Postgres 18 on Neon Free', 'stackNeon'],
+  ['Google Cloud Storage', 'stackGcs'],
+  ['@shopify/hydrogen 2026.10.2', 'stackHydrogen'],
+  ['Node 24.22.1 · GitHub Actions', 'stackNode'],
+] as const
+const HOOKS = [
+  ['products/update', '2026-10-27 14:02:11 UTC', 'processed', 'led led--green', 'hookA1'],
+  ['products/update', '2026-10-27 14:02:38 UTC', 'coalesced', 'led led--blue', 'hookA2'],
+  ['collections/update', '2026-10-27 14:02:59 UTC', 'coalesced', 'led led--blue', 'hookA2'],
+  ['products/update', '2026-10-27 14:03:04 UTC', 'skipped', 'led', 'hookA3'],
+  ['products/create', '2026-10-27 14:09:40 UTC', 'failed', 'led led--yellow', 'hookA4'],
+] as const
+const host = new URL(CMS_URL).host
+const [goBefore, goAfter] = t(locale, 'goText').split('{host}')
+const [hookBefore, hookAfter] = t(locale, 'hookText').split('{table}')
+---
+<Base locale={locale} title={t(locale, 'hiwTitle')} description={t(locale, 'hiwSub')} paths={{ en: '/how-it-works', fr: '/fr/how-it-works' }}>
+  <section class="row" aria-labelledby="hiw-h">
+    <div class="tile t-diag s12">
+      <div class="beams" aria-hidden="true"><div class="beams__sweep"></div></div>
+      <h1 id="hiw-h" data-owner="Code"><Hud o="Code" f="page copy · a CMS page later" />{t(locale, 'hiwHeading')}</h1>
+      <p class="hero__sub" data-owner="Code"><Hud o="Code" f="page copy" />{t(locale, 'hiwSub')}</p>
+      <Acts
+        links={[
+          { label: t(locale, 'openCms'), sub: t(locale, 'openCmsSub'), url: CMS_ADMIN, style: 'primary' },
+          { label: t(locale, 'hiwWebhookLink'), url: '#webhooks', style: 'secondary' },
+        ]}
+        owner="Code"
+        field="showcase links"
+      />
+      <div class="flow" role="group" aria-label={t(locale, 'hiwFlow')} data-owner="Code">
+        <Hud o="Code" f="diagram" />
+        <div class="flow__grid">
+          <div class="mod mod--payload"><span class="mod__name"><span class="led led--blue" aria-hidden="true"></span>Payload 4</span><p>{t(locale, 'modPayload')}</p></div>
+          <div class="mod mod--shopify"><span class="mod__name"><span class="led led--green" aria-hidden="true"></span>Shopify</span><p>{t(locale, 'modShopify')}</p></div>
+          <div class="merge" aria-hidden="true"><span class="arrow"></span></div>
+          <div class="mod mod--astro"><span class="mod__name"><span class="led led--yellow" aria-hidden="true"></span>{t(locale, 'modRebuild')}</span><p>{t(locale, 'modRebuildText')}</p></div>
+          <div class="wire" aria-hidden="true"><span class="arrow"></span></div>
+          <div class="mod mod--store"><span class="mod__name">Cloudflare Workers</span><p>{t(locale, 'modStoreText')}</p></div>
+          <p class="bus" data-owner="Payload">{t(locale, 'busServes')} {domains.map((d) => <span class="bus__chip">{d.slug}</span>)}</p>
+        </div>
+      </div>
+      <div class="hudband"><p data-owner="Code"><b>Code</b><span>{localePath(locale, '/how-it-works')}</span><span>{t(locale, 'routeBuilt')}</span></p></div>
+    </div>
+  </section>
+
+  <section class="row" aria-labelledby="cen-h">
+    <div class="tile t-text s4">
+      <h2 id="cen-h" data-owner="Code"><Hud o="Code" f="page copy" />{t(locale, 'cenHeading')}</h2>
+      <div class="rich"><p>{t(locale, 'cenText')}</p></div>
+    </div>
+    <div class="tile t-doms s8">
+      <div class="doms__head" data-owner="Payload">
+        <Hud o="Payload" f="domains collection · read at build" />
+        <h3>domains</h3>
+        <p class="doms__fields">{t(locale, 'domFields')}</p>
+      </div>
+      <ul data-owner="Payload">
+        {
+          domains.map((d) => (
+            <li class="dom">
+              <span class="jack" aria-hidden="true" />
+              <span class="dom__slug">{d.slug}</span>
+              <span class="dom__name">{d.url && d.slug !== 'store' ? <a class="inl" href={d.url}>{d.name}</a> : d.name}</span>
+              <span class="dom__here">
+                <span class={d.slug === 'store' || d.status === 'live' ? 'led led--green' : 'led'} aria-hidden="true" />
+                {d.slug === 'store' ? t(locale, 'thisSite') : t(locale, d.status === 'live' ? 'live' : 'planned')}
+              </span>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section class="row" id="webhooks" aria-labelledby="wh-h">
+    <div class="tile t-hook s12">
+      <div class="hook__head">
+        <h2 id="wh-h">{t(locale, 'hookHeading')}</h2>
+        <p class="hook__stamp"><span class="led led--yellow" aria-hidden="true"></span>{t(locale, 'hookStamp')}</p>
+      </div>
+      <p>{hookBefore}<span class="host">webhook-events</span>{hookAfter}</p>
+      <div data-owner="Code">
+        <Hud o="Code" f="demo rows · webhook-events later" />
+        <table class="hook">
+          <caption class="sr-only">{t(locale, 'hookCaption')}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{t(locale, 'hookSource')}</th><th scope="col">{t(locale, 'hookTopic')}</th><th scope="col">{t(locale, 'hookAt')}</th>
+              <th scope="col">{t(locale, 'hookStatus')}</th><th scope="col">{t(locale, 'hookAction')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              HOOKS.map(([topic, at, status, led, action]) => (
+                <tr>
+                  <td>shopify</td><td>{topic}</td><td>{at}</td>
+                  <td><span class="st"><span class={led} aria-hidden="true" />{status}</span></td>
+                  <td>{t(locale, action)}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="row" aria-labelledby="stk-h">
+    <div class="tile t-stack s12">
+      <div class="t-stack__intro" data-owner="Code">
+        <Hud o="Code" f="stack · from the architecture record" />
+        <h2 id="stk-h">{t(locale, 'stackHeading')}</h2>
+        <p>{t(locale, 'stackIntro')}</p>
+      </div>
+      <ul class="stack" data-owner="Code">
+        {STACK.map(([name, key]) => <li><h3>{name}</h3><p>{t(locale, key)}</p></li>)}
+      </ul>
+    </div>
+  </section>
+
+  <section class="row" aria-labelledby="go-h">
+    <div class="tile t-built s12">
+      <div class="beams" aria-hidden="true"><div class="beams__sweep"></div></div>
+      <h2 id="go-h" data-owner="Code"><Hud o="Code" f="page copy" />{t(locale, 'goHeading')}</h2>
+      <p data-owner="Code">{goBefore}<span class="host">{host}</span>{goAfter}</p>
+      <Acts
+        links={[
+          { label: t(locale, 'openCms'), sub: t(locale, 'openCmsSub'), url: CMS_ADMIN, style: 'primary' },
+          { label: t(locale, 'readDocs'), url: localePath(locale, '/docs'), style: 'secondary' },
+        ]}
+        owner="Code"
+        field="showcase links"
+      />
+    </div>
+  </section>
+</Base>

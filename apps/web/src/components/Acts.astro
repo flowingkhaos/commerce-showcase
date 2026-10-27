@@ -1,13 +1,18 @@
 ---
 // The board's action pair: one blue pill (primary), one ghost (secondary).
+import Hud from './Hud'
+
 type Link = { label: string; url: string; style: 'primary' | 'secondary'; sub?: string }
 interface Props {
   links: Link[]
   owner: 'Payload' | 'Code'
+  /** The X-ray callout's field name. */
+  field: string
 }
-const { links, owner } = Astro.props
+const { links, owner, field } = Astro.props
 ---
 <div class="acts" data-owner={owner}>
+  <Hud o={owner} f={field} />
   {
     links.map((l) =>
       l.style === 'primary' ? (

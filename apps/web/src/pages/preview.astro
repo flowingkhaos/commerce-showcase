@@ -1,0 +1,72 @@
+---
+// Live preview (apps/cms/README.md § Live preview): the CMS admin frames this page through a
+// link it signed. The four values go to the CMS server side; it checks the signature, so the
+// site holds no secret. The draft renders with the normal page and doc views. src/worker.ts sets
+// frame-ancestors (the CMS only), no-store and noindex.
+import Blocks from '../components/Blocks.astro'
+import DocView from '../components/DocView.astro'
+import { t, type Locale } from '../i18n'
+import Base from '../layouts/Base.astro'
+import { CMS_ORIGIN, CMS_URL, counterpart, getDocs, type Doc, type Page } from '../lib/cms'
+
+export const prerender = false
+
+const MESSAGES: Record<number, string> = {
+  403: 'This preview link has expired or is not valid. Reopen the preview from the CMS admin.\nCe lien d’aperçu a expiré ou n’est pas valide. Rouvrez l’aperçu dans l’administration du CMS.\n',
+  404: 'This document is gone, or this site does not show it.\nCe document n’existe plus, ou ce site ne l’affiche pas.\n',
+  503: 'The CMS does not answer. Try again in a moment.\nLe CMS ne répond pas. Réessayez dans un instant.\n',
+}
+const plain = (status: number) =>
+  new Response(MESSAGES[status], { status, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+
+const params = Astro.url.searchParams
+const collection = params.get('collection')
+// Pages and docs have views here; articles do not (yet), nor products (no collection yet).
+if (collection !== 'pages' && collection !== 'docs') return plain(404)
+
+let res: Response
+try {
+  const signed = new URLSearchParams(['collection', 'id', 'exp', 'sig'].map((k) => [k, params.get(k) ?? '']))
+  res = await fetch(`${CMS_URL}/api/preview?${signed}`, {
+    cache: 'no-store',
+    headers: { accept: 'application/json' },
+    signal: AbortSignal.timeout(15_000), // a cold CMS takes about 6 s
+  })
+} catch {
+  return plain(503)
+}
+if (res.status === 403 || res.status === 404) return plain(res.status)
+if (!res.ok) return plain(503)
+
+const draft = (await res.json()) as (Page | Doc) & { id: number; locale?: string; title: string }
+const locale: Locale = draft.locale === 'fr' ? 'fr' : 'en'
+const docs = collection === 'docs' ? await getDocs(locale) : []
+const other = collection === 'docs' ? counterpart(draft as Doc, await getDocs(locale === 'fr' ? 'en' : 'fr')) : null
+---
+<Base
+  locale={locale}
+  title={`${t(locale, 'draft')} ${draft.title} — OVRLD`}
+  paths={{ en: '/', fr: '/fr' }}
+  noindex
+  mainClass={collection === 'docs' ? 'wrap docs-frame' : 'wrap wall'}
+>
+  <div class="draftbar" role="status">
+    <span class="led led--yellow" aria-hidden="true"></span>
+    <p><b>{t(locale, 'draft')}</b> {t(locale, 'draftNote')}</p>
+    <a href={`${CMS_URL}/admin/collections/${collection}/${draft.id}`}>{t(locale, 'backEditor')}</a>
+  </div>
+  {
+    collection === 'pages' ? (
+      <Blocks blocks={(draft as Page).layout ?? []} locale={locale} />
+    ) : (
+      <DocView locale={locale} docs={docs} doc={draft as Doc} other={other} />
+    )
+  }
+  <script is:inline define:vars={{ origin: CMS_ORIGIN }}>
+    // The admin sends nothing until the page says it is ready; then each save reloads it.
+    parent.postMessage({ type: 'payload-live-preview', ready: true }, origin)
+    addEventListener('message', (e) => {
+      if (e.origin === origin && e.data && e.data.type === 'payload-document-event') location.reload()
+    })
+  </script>
+</Base>

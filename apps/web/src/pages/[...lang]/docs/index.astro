@@ -1,0 +1,15 @@
+---
+// The docs index: the manual's chapters, from the CMS `docs` collection for this domain.
+import DocView from '../../../components/DocView.astro'
+import { localeFromParam, t } from '../../../i18n'
+import Base from '../../../layouts/Base.astro'
+import { getDocs } from '../../../lib/cms'
+
+export const getStaticPaths = () => [{ params: { lang: undefined } }, { params: { lang: 'fr' } }]
+
+const locale = localeFromParam(Astro.params.lang)!
+const docs = await getDocs(locale)
+---
+<Base locale={locale} title={`${t(locale, 'manualTitle')} — OVRLD`} description={t(locale, 'docsLede')} paths={{ en: '/docs', fr: '/fr/docs' }} mainClass="wrap docs-frame">
+  <DocView locale={locale} docs={docs} />
+</Base>
