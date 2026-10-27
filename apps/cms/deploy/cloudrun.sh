@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Deploy the showcase CMS to Google Cloud Run (scale to zero, free tier), from this workstation:
 #   bash deploy/cloudrun.sh <gcp-project-id> [--seed]
-# Needs: `gcloud auth login` done, podman, and ~/.config/kos/showcase-cms.prod.env (mode 600)
+# Needs: `gcloud auth login` done, and ~/.config/kos/showcase-cms.prod.env (mode 600)
 # holding DATABASE_URL (the Neon string) and PAYLOAD_SECRET. Idempotent: the first run also
 # creates the registry, the media bucket, the two secrets and their permissions.
 # --seed loads the sample domains and pages once (it overwrites those sample rows if re-run).
@@ -28,7 +28,12 @@ RUNTIME_SA="$NUMBER-compute@developer.gserviceaccount.com"
 URL="https://$SERVICE-$NUMBER.$REGION.run.app"
 
 echo "== one-time setup (skips what exists)"
-gcloud services enable run.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com storage.googleapis.com --quiet
+gcloud services enable run.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com \
+  storage.googleapis.com cloudbuild.googleapis.com --quiet
+# Cloud Build runs as the default compute account; new projects grant it no roles by default.
+for role in roles/artifactregistry.writer roles/logging.logWriter roles/storage.objectViewer; do
+  gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$RUNTIME_SA" --role="$role" --condition=None --quiet >/dev/null
+done
 gcloud artifacts repositories describe showcase --location="$REGION" >/dev/null 2>&1 \
   || gcloud artifacts repositories create showcase --repository-format=docker --location="$REGION" --quiet
 gcloud storage buckets describe "gs://$BUCKET" >/dev/null 2>&1 \
@@ -49,11 +54,9 @@ bun run payload migrate
 if [ "$SEED" = --seed ]; then SHOWCASE_CMS_CREDS="$ADMINFILE" bun run seed; fi
 unset DATABASE_URL PAYLOAD_SECRET
 
-echo "== build and push the image"
+echo "== build the image in Cloud Build (uploads the source, ~1 MB; .gitignore keeps .env out)"
 TAG="$REPO/cms:$(git rev-parse --short HEAD)$(git diff --quiet HEAD -- . || echo -dirty)"
-podman build --platform linux/amd64 -t "$TAG" .
-gcloud auth print-access-token | podman login -u oauth2accesstoken --password-stdin "$REGION-docker.pkg.dev" >/dev/null
-podman push "$TAG"
+gcloud builds submit --tag="$TAG" --region="$REGION" --machine-type=e2-highcpu-8 --quiet .
 
 echo "== deploy"
 # One instance at most: the rate limiter's counters live in memory, and the worst-case bill
