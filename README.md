@@ -12,6 +12,7 @@ Status: the CMS is live. The storefront, OVRLD (an invented fitness store), is b
 |---|---|
 | [`apps/cms`](apps/cms/README.md) | The CMS: Payload 4 on Google Cloud Run, Postgres on Neon. One admin serves four sites through a `domain` field. Start with its README. |
 | `apps/web` | The storefront: Astro on Cloudflare Workers. Not in the repo yet. |
+| [`apps/shop-setup`](apps/shop-setup/README.md) | The script that loads the OVRLD catalogue into a Shopify development store. |
 
 ## Who owns which data
 
