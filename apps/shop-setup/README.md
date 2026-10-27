@@ -13,7 +13,8 @@ You need a free development store (Shopify Partner account → Dev Dashboard →
 store → Dev**) and, in the same organization, a Dev Dashboard app installed on it with the scopes
 `write_products, write_inventory, read_locations, write_translations, write_locales,
 write_publications`. Install the **Headless** channel and create a storefront named
-`OVRLD storefront`. In **Settings → Languages**, add French to the store's market.
+`OVRLD storefront`. In **Settings → Languages**, publish French **and assign it to the store's
+domain**: a published language with no domain is not served, and the French queries return English.
 
 ```sh
 # an env file outside the repo with SHOPIFY_STORE_DOMAIN, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET
