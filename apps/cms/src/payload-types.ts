@@ -282,6 +282,8 @@ export interface Media {
    * Photographer and source, e.g. "Jane Doe / Unsplash".
    */
   credit?: string | null;
+  prefix?: string | null;
+  _objectKey?: string | null;
   createdBy?: {
     relationTo: 'users';
     value: number | User;
@@ -855,6 +857,8 @@ export interface DocsSelect<T extends boolean = true> {
 export interface MediaSelect<T extends boolean = true> {
   alt?: T;
   credit?: T;
+  prefix?: T;
+  _objectKey?: T;
   createdBy?: T;
   updatedBy?: T;
   updatedAt?: T;

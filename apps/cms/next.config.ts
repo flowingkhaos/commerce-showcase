@@ -7,6 +7,9 @@ const __filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(__filename)
 
 const nextConfig: NextConfig = {
+  // A self-contained server (.next/standalone) keeps the image under the registry's free 0.5 GB.
+  output: 'standalone',
+  outputFileTracingRoot: path.resolve(dirname),
   // Admin-only app: no frontend, so `/` goes to the admin.
   async redirects() {
     return [{ source: '/', destination: '/admin', permanent: false }]

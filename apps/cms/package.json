@@ -18,8 +18,9 @@
   "dependencies": {
     "@payloadcms/db-postgres": "4.0.0-beta.4",
     "@payloadcms/next": "4.0.0-beta.4",
-    "@payloadcms/translations": "4.0.0-beta.4",
     "@payloadcms/richtext-lexical": "4.0.0-beta.4",
+    "@payloadcms/storage-gcs": "4.0.0-beta.4",
+    "@payloadcms/translations": "4.0.0-beta.4",
     "@payloadcms/ui": "4.0.0-beta.4",
     "cross-env": "10.1.0",
     "next": "16.4.2",

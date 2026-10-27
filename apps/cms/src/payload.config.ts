@@ -1,5 +1,6 @@
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { gcsStorage } from '@payloadcms/storage-gcs'
 import { en } from '@payloadcms/translations/languages/en'
 import { fr } from '@payloadcms/translations/languages/fr'
 import path from 'path'
@@ -32,7 +33,7 @@ export default buildConfig({
   graphQL: { disable: true },
   maxDepth: 2,
   typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },
-  // Migrations, never push: local and the VM run the same schema path. `next start` applies
+  // Migrations, never push: local and Cloud Run run the same schema path. The server applies
   // pending migrations on boot; `payload migrate` does it by hand.
   db: postgresAdapter({
     pool: { connectionString: process.env.DATABASE_URL },
@@ -40,5 +41,16 @@ export default buildConfig({
     migrationDir: path.resolve(dirname, 'migrations'),
     prodMigrations: migrations,
   }),
+  // On Cloud Run the disk is wiped on every restart, so media go to a bucket (same region,
+  // credentials from the service account). Locally GCS_BUCKET is unset and media stay on disk.
+  // Payload 4: storage adapters live under `storage`, not `plugins`.
+  storage: [
+    gcsStorage({
+      enabled: Boolean(process.env.GCS_BUCKET),
+      bucket: process.env.GCS_BUCKET || 'unset',
+      collections: { media: true },
+      options: {},
+    }),
+  ],
   telemetry: false,
 })

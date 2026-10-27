@@ -21,9 +21,6 @@ services:
       DATABASE_URL: postgres://showcase:${DB_PASSWORD}@db:5432/showcase
       PAYLOAD_SECRET: ${PAYLOAD_SECRET:?}
       SERVER_URL: https://${CMS_HOST:?}
-      SHOWCASE_CMS_ADMIN_EMAIL: ${SHOWCASE_CMS_ADMIN_EMAIL}
-      SHOWCASE_CMS_ADMIN_PASSWORD: ${SHOWCASE_CMS_ADMIN_PASSWORD}
-      SHOWCASE_CMS_API_KEY: ${SHOWCASE_CMS_API_KEY}
     volumes: [media:/app/media]
     depends_on:
       db: { condition: service_healthy }

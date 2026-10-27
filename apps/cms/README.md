@@ -6,7 +6,10 @@ admin shows what a CMS serving many websites looks like. Shape: OSDocs
 `projects/commerce-showcase/architecture.md` § Backend shape.
 
 Runs on **Node + Postgres 18**, never on Workers (the 10-25 spike: admin CPU and PBKDF2 both fail
-on workerd; `raw/research/commerce-showcase-spike-2026-10-25`).
+on workerd; `raw/research/commerce-showcase-spike-2026-10-25`). Production: **Google Cloud Run**
+(us-east5, scales to zero, free tier) + **Neon** Postgres (AWS us-east-2) + a **GCS bucket** for
+media. A request to a sleeping CMS waits for a cold start (≈ 6 s measured locally), so sites read it
+with a short timeout and keep their last good copy.
 
 ## Run it locally
 
@@ -23,7 +26,20 @@ bun run seed && bun run smoke            # idempotent seed; 38 checks
 - Stop / logs: `systemctl --user stop showcase-cms` · `journalctl --user -u showcase-cms -f`.
 - First-time database: `podman run -d --name showcase-cms-db -p 127.0.0.1:55433:5432 -e POSTGRES_USER=showcase -e POSTGRES_PASSWORD=showcase -e POSTGRES_DB=showcase -v showcase-cms-pg:/var/lib/postgresql docker.io/library/postgres:18`, then `cp .env.example .env` and set `PAYLOAD_SECRET`.
 - Schema change: edit a collection → `bun run payload migrate:create <name>` → rebuild →
-  restart (`next start` applies pending migrations on boot). `push` is off everywhere.
+  restart (the server applies pending migrations on boot). `push` is off everywhere.
+- Rate limits per IP and minute (`src/proxy.ts`): 10 sign-in attempts, 60 writes, 300 reads → 429.
+
+## Deploy (Cloud Run)
+
+```sh
+bash deploy/cloudrun.sh <gcp-project-id> --seed   # first time; later runs without --seed
+```
+
+Needs `gcloud auth login`, podman, and `~/.config/kos/showcase-cms.prod.env` (mode 600) with
+`DATABASE_URL` (Neon) and `PAYLOAD_SECRET`. The script migrates Neon from here, builds and pushes
+the image, deploys (max 1 instance, 512 MiB, zero when idle) and runs the smoke against the live
+URL. Prod admin login + API key: `~/.config/kos/showcase-cms.prod-admin.env`.
+`deploy/compose.yml` + `Caddyfile` run the same image with its own Postgres on any one VM.
 
 ## Read contract (for the sites)
 
@@ -83,6 +99,6 @@ multipart (`file` + `_payload={"alt":"…","credit":"…"}`).
 
 ## Not built yet
 
-The visitor door (Turnstile, ephemeral visitor users, sandbox drafts), the request guard and
-rate limits, the products and webhook-events collections, the `site` global, live preview,
-rebuild dispatch, R2 storage, and the production host. Each lands before the CMS is public.
+The visitor door (Turnstile, ephemeral visitor users, sandbox drafts), the products and
+webhook-events collections, the `site` global, a `collectionList` block, live preview and
+rebuild dispatch.

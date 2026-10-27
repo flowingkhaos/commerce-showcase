@@ -28,25 +28,23 @@ const send = async (method, path, data, headers = key) => {
 const pagesOf = (domain, locale) =>
   `/api/pages?where[domain.slug][equals]=${domain}&where[locale][equals]=${locale}&depth=1&limit=100`
 
-// The read the Fresh demos make (DEMO.md § CMS route), per domain and locale.
-for (const [domain, fr, en] of [
-  ['renovation-demo', 'garanties', 'warranties'],
-  ['plumbing-demo', 'entretien-annuel', 'annual-service'],
-  ['store', 'home', 'home'],
-]) {
-  for (const [locale, slug] of [['fr', fr], ['en', en]]) {
+// The read the Fresh demos make (DEMO.md § CMS route). Their pages belong to their sessions,
+// so only the shape is checked there; content checks run on the seeded store pages.
+for (const domain of ['renovation-demo', 'plumbing-demo', 'store']) {
+  for (const locale of ['fr', 'en']) {
     const { status, body } = await get(pagesOf(domain, locale))
-    const slugs = body.docs?.map((d) => d.slug) ?? []
-    check(`${domain} ${locale}: 200 with ${slug}`, status === 200 && slugs.includes(slug), `${status} ${slugs}`)
+    check(`${domain} ${locale}: 200`, status === 200 && Array.isArray(body.docs), String(status))
     check(`${domain} ${locale}: only this domain and locale`, body.docs?.every((d) => d.locale === locale && d.domain?.slug === domain))
-    check(`${domain} ${locale}: every block has a blockType`, body.docs?.every((d) => d.layout?.every((b) => typeof b.blockType === 'string')))
-    if (locale === 'en') check(`${domain} en: translationOf points at the fr doc`, body.docs?.some((d) => d.translationOf?.slug === fr))
+    check(`${domain} ${locale}: every block has a blockType, every doc an updatedAt`, body.docs?.every((d) => d.updatedAt && d.layout?.every((b) => typeof b.blockType === 'string')))
   }
 }
-const reno = await get(pagesOf('renovation-demo', 'fr'))
-const richBlock = reno.body.docs.find((d) => d.slug === 'garanties')?.layout.find((b) => b.blockType === 'richText')
-check('rich text ships server-made html', /<h2[^>]*>Main-d.œuvre/.test(richBlock?.html ?? ''), richBlock?.html?.slice(0, 80))
-check('anonymous read hides the draft', !reno.body.docs.some((d) => d.slug === 'brouillon-prive'))
+const storeFr = await get(pagesOf('store', 'fr'))
+const storeEn = await get(pagesOf('store', 'en'))
+check('store: fr home published', storeFr.body.docs?.some((d) => d.slug === 'home'))
+check('store en: translationOf points at the fr doc', storeEn.body.docs?.some((d) => d.slug === 'home' && d.translationOf?.slug === 'home' && d.translationOf?.locale === 'fr'))
+const richBlock = storeFr.body.docs.find((d) => d.slug === 'home')?.layout.find((b) => b.blockType === 'richText')
+check('rich text ships server-made html', /<h2[^>]*>Une page, un CMS/.test(richBlock?.html ?? ''), richBlock?.html?.slice(0, 80))
+check('anonymous read hides the draft', !storeFr.body.docs.some((d) => d.slug === 'brouillon-prive'))
 const draftAsk = await get(`/api/pages?where[slug][equals]=brouillon-prive&draft=true`)
 check('anonymous draft=true still hides the draft', draftAsk.body.docs?.length === 0, JSON.stringify(draftAsk.body).slice(0, 120))
 
@@ -63,13 +61,14 @@ check('anonymous cannot list users', (await get('/api/users')).status === 403)
 const anonCreate = await send('POST', '/api/pages', { title: 'x' }, {})
 check('anonymous cannot create a page', anonCreate.status === 403, String(anonCreate.status))
 check('API key reads the draft', (await get('/api/pages?where[slug][equals]=brouillon-prive&draft=true', key)).body.docs?.length === 1)
-const dupe = await send('POST', '/api/pages', { title: 'dupe', domain: reno.body.docs[0].domain.id, locale: 'fr', slug: 'garanties', _status: 'published' })
+const storeId = storeFr.body.docs[0].domain.id
+const dupe = await send('POST', '/api/pages', { title: 'dupe', domain: storeId, locale: 'fr', slug: 'home', _status: 'published' })
 check('duplicate (domain, locale, slug) is refused', dupe.status === 400, String(dupe.status))
-const delDomain = await send('DELETE', `/api/domains/${reno.body.docs[0].domain.id}`)
+const delDomain = await send('DELETE', `/api/domains/${storeId}`)
 check('deleting a domain with content is blocked', delDomain.status === 409, `${delDomain.status} ${JSON.stringify(delDomain.body).slice(0, 120)}`)
-const made = await send('POST', '/api/pages', { title: 'Smoke', domain: reno.body.docs[0].domain.id, locale: 'fr', slug: 'smoke-temp', _status: 'published', layout: [{ blockType: 'banner', text: 'smoke' }] })
+const made = await send('POST', '/api/pages', { title: 'Smoke', domain: storeId, locale: 'fr', slug: 'smoke-temp', _status: 'published', layout: [{ blockType: 'banner', text: 'smoke' }] })
 check('API key creates a published page', made.status === 201, `${made.status} ${JSON.stringify(made.body).slice(0, 160)}`)
-check('…and anonymous sees it at once', (await get(pagesOf('renovation-demo', 'fr'))).body.docs.some((d) => d.slug === 'smoke-temp'))
+check('…and anonymous sees it at once', (await get(pagesOf('store', 'fr'))).body.docs.some((d) => d.slug === 'smoke-temp'))
 if (made.body?.doc?.id) check('…and it deletes', (await send('DELETE', `/api/pages/${made.body.doc.id}`)).status === 200)
 
 // Admin surface.
@@ -78,6 +77,14 @@ check('admin login works (PBKDF2 on Node)', login.status === 200 && Boolean(logi
 const admin = await get('/admin/login')
 check('/admin/login serves the admin', admin.status === 200 && admin.body.includes('</html>'), String(admin.status))
 check('noindex header on the admin', admin.headers.get('x-robots-tag')?.includes('noindex'))
+
+// Rate limit, last: it blocks this IP's sign-ins for a minute. An unknown email never locks
+// the real admin account.
+const codes = []
+for (let i = 0; i < 12; i++) {
+  codes.push((await send('POST', '/api/users/login', { email: 'nobody@example.invalid', password: 'x' }, {})).status)
+}
+check('sign-in attempts are rate limited (429 by the 12th)', codes.at(-1) === 429, codes.join(' '))
 
 console.log(`\n${pass}/${pass + fail} passed`)
 process.exit(fail ? 1 : 0)
