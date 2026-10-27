@@ -45,7 +45,8 @@ const creds: Record<string, string | undefined> = fromEnv
             .map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)])
         : [],
     )
-const email = creds.SHOWCASE_CMS_ADMIN_EMAIL || 'admin@showcase.local'
+// A random default: the admin email appears nowhere public (architecture § Security checks).
+const email = creds.SHOWCASE_CMS_ADMIN_EMAIL || `admin-${randomBytes(4).toString('hex')}@showcase.local`
 const password = creds.SHOWCASE_CMS_ADMIN_PASSWORD || randomBytes(18).toString('base64url')
 const apiKey = creds.SHOWCASE_CMS_API_KEY || randomUUID()
 // The admin is the one row the seed keeps in step with the creds (password, API key).
