@@ -43,7 +43,7 @@ jobs:
           node-version: 24
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - run: echo "Build reason: $EVENT $REASON"
+      - run: echo "Build reason $EVENT $REASON"
         env:
           EVENT: ${{ github.event_name }}
           REASON: ${{ inputs.reason }}
