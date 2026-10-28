@@ -44,8 +44,6 @@ const storeFr = await get(pagesOf('store', 'fr'))
 const storeEn = await get(pagesOf('store', 'en'))
 check('store: fr home published', storeFr.body.docs?.some((d) => d.slug === 'home'))
 check('store en: translationOf points at the fr doc', storeEn.body.docs?.some((d) => d.slug === 'home' && d.translationOf?.slug === 'home' && d.translationOf?.locale === 'fr'))
-const richBlock = storeFr.body.docs?.find((d) => d.slug === 'home')?.layout.find((b) => b.blockType === 'richText')
-check('rich text ships server-made html', /<h2[^>]*>Une page, un CMS/.test(richBlock?.html ?? ''), richBlock?.html?.slice(0, 80))
 check('anonymous read hides the draft', Array.isArray(storeFr.body.docs) && !storeFr.body.docs.some((d) => d.slug === 'brouillon-prive'))
 const draftAsk = await get(`/api/pages?where[slug][equals]=brouillon-prive&draft=true`)
 check('anonymous draft=true still hides the draft', draftAsk.body.docs?.length === 0, JSON.stringify(draftAsk.body).slice(0, 120))
@@ -72,9 +70,16 @@ const dupe = await send('POST', '/api/pages', { title: 'dupe', domain: storeId, 
 check('duplicate (domain, locale, slug) is refused', dupe.status === 400, String(dupe.status))
 const delDomain = await send('DELETE', `/api/domains/${storeId}`)
 check('deleting a domain with content is blocked', delDomain.status === 409, `${delDomain.status} ${JSON.stringify(delDomain.body).slice(0, 120)}`)
-const made = await send('POST', '/api/pages', { title: 'Smoke', domain: storeId, locale: 'fr', slug: 'smoke-temp', _status: 'published', layout: [{ blockType: 'banner', text: 'smoke' }] })
+// The page brings its own rich text, so the html check never depends on what a site seeded.
+const node = { version: 1, direction: null, format: '', indent: 0 }
+const text = { type: 'text', text: 'Une page, un CMS', version: 1, detail: 0, format: 0, mode: 'normal', style: '' }
+const richText = { root: { ...node, type: 'root', children: [{ ...node, type: 'heading', tag: 'h2', children: [text] }] } }
+const made = await send('POST', '/api/pages', { title: 'Smoke', domain: storeId, locale: 'fr', slug: 'smoke-temp', _status: 'published', layout: [{ blockType: 'banner', text: 'smoke' }, { blockType: 'richText', richText }] })
 check('API key creates a published page', made.status === 201, `${made.status} ${JSON.stringify(made.body).slice(0, 160)}`)
-check('…and anonymous sees it at once', (await get(pagesOf('store', 'fr'))).body.docs.some((d) => d.slug === 'smoke-temp'))
+const madeBack = (await get(pagesOf('store', 'fr'))).body.docs.find((d) => d.slug === 'smoke-temp')
+check('…and anonymous sees it at once', !!madeBack)
+const richBlock = madeBack?.layout.find((b) => b.blockType === 'richText')
+check('rich text ships server-made html', /<h2[^>]*>Une page, un CMS/.test(richBlock?.html ?? ''), richBlock?.html?.slice(0, 80))
 if (made.body?.doc?.id) check('…and it deletes', (await send('DELETE', `/api/pages/${made.body.doc.id}`)).status === 200)
 const list = { blockType: 'collectionList', heading: 'Shop by collection', items: [{ handle: 'hoodies', description: 'Heavy fleece.' }] }
 const listed = await send('POST', '/api/pages', { title: 'Smoke list', domain: storeId, locale: 'fr', slug: 'smoke-list', _status: 'published', layout: [list] })
