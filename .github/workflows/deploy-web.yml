@@ -1,0 +1,51 @@
+name: deploy-web
+
+# Builds the storefront and deploys it to Cloudflare Workers. Runs on a push to main that touches
+# the storefront, on demand (the CMS asks for it when a store page is published), and nightly so
+# Shopify's stock and prices stay fresh. Pull requests never run it: they get no secrets.
+on:
+  push:
+    branches: [main]
+    paths: ['apps/web/**', '.github/workflows/deploy-web.yml']
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: Why this build runs
+        required: false
+        default: manual
+  schedule:
+    - cron: '15 7 * * *'
+
+# One build runs and one waits; a burst of publishes joins the build that waits.
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      PUBLIC_STORE_DOMAIN: ${{ secrets.PUBLIC_STORE_DOMAIN }}
+      PRIVATE_STOREFRONT_API_TOKEN: ${{ secrets.PRIVATE_STOREFRONT_API_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: echo "Build reason: $EVENT $REASON"
+        env:
+          EVENT: ${{ github.event_name }}
+          REASON: ${{ inputs.reason }}
+      - run: bun run build
+      - run: npx wrangler deploy
