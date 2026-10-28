@@ -50,6 +50,8 @@ export type ProductStory = {
   meta?: { title?: string | null; description?: string | null } | null
 }
 export type Domain = { slug: string; name: string; url?: string | null; kind: string; status: 'live' | 'planned' }
+/** One call from Shopify, as the CMS logged it (webhook-events, kept a week). */
+export type WebhookEvent = { id: number; topic: string; summary?: string | null; rebuild: 'requested' | 'failed' | 'skipped'; createdAt: string }
 
 // One read per document per build, however many pages ask for it. A failed read is not kept.
 const memo = new Map<string, Promise<unknown>>()
@@ -94,6 +96,10 @@ export const getProductStories = async (locale: Locale) =>
   (await get<{ docs: ProductStory[] }>('/api/products', { ...inStore(locale), limit: '100' })).docs
 
 export const getDomains = async () => (await get<{ docs: Domain[] }>('/api/domains', { depth: '0', limit: '50' })).docs
+
+/** Shopify's latest calls, newest first. One store, so not filtered by domain. */
+export const getWebhookEvents = async () =>
+  (await get<{ docs: WebhookEvent[] }>('/api/webhook-events', { sort: '-createdAt', limit: '8', depth: '0' })).docs
 
 // Every "Open the CMS" link lands on the sign-in view, which has « Enter as visitor ».
 export const CMS_ADMIN = `${CMS_URL}/admin/login`

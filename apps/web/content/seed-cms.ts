@@ -228,3 +228,5 @@ await api(`products/${enHoodie}`, { method: 'PATCH', body: JSON.stringify({ tran
 await api(`products/${frHoodie}`, { method: 'PATCH', body: JSON.stringify({ translationOf: enHoodie }) })
 console.log(`hoodie story: en ${enHoodie}, fr ${frHoodie}`)
 
+
+export {} // a module, so the top-level awaits type-check

@@ -1,12 +1,12 @@
 ---
 // How it works (R4 How-it-works board): the patch diagram and the stack (store code, facts from
 // the architecture record and its 2026-10-27 Cloud Run amendment), the domains read from the
-// CMS at build, and the webhook log as demo rows until the CMS has a webhook-events collection.
+// CMS at build, and the latest rows of the CMS's webhook log (webhook-events), read at build.
 import Acts from '../../components/Acts.astro'
 import Hud from '../../components/Hud'
 import { localeFromParam, localePath, t } from '../../i18n'
 import Base from '../../layouts/Base.astro'
-import { CMS_ADMIN, CMS_URL, getDomains } from '../../lib/cms'
+import { CMS_ADMIN, CMS_URL, getDomains, getWebhookEvents } from '../../lib/cms'
 
 export const getStaticPaths = () => [{ params: { lang: undefined } }, { params: { lang: 'fr' } }]
 
@@ -26,13 +26,14 @@ const STACK = [
   ['@shopify/hydrogen 2026.10.2', 'stackHydrogen'],
   ['Node 24.22.1 · GitHub Actions', 'stackNode'],
 ] as const
-const HOOKS = [
-  ['products/update', '2026-10-27 14:02:11 UTC', 'processed', 'led led--green', 'hookA1'],
-  ['products/update', '2026-10-27 14:02:38 UTC', 'coalesced', 'led led--blue', 'hookA2'],
-  ['collections/update', '2026-10-27 14:02:59 UTC', 'coalesced', 'led led--blue', 'hookA2'],
-  ['products/update', '2026-10-27 14:03:04 UTC', 'skipped', 'led', 'hookA3'],
-  ['products/create', '2026-10-27 14:09:40 UTC', 'failed', 'led led--yellow', 'hookA4'],
-] as const
+const hooks = await getWebhookEvents()
+// The CMS's answer to each call: GitHub took the build request, refused it, or the CMS has no token.
+const REBUILD = {
+  requested: ['led led--green', 'hookA1'],
+  failed: ['led led--yellow', 'hookA4'],
+  skipped: ['led', 'hookA3'],
+} as const
+const utc = (iso: string) => `${iso.replace('T', ' ').slice(0, 19)} UTC`
 const host = new URL(CMS_URL).host
 const [goBefore, goAfter] = t(locale, 'goText').split('{host}')
 const [hookBefore, hookAfter] = t(locale, 'hookText').split('{table}')
@@ -100,11 +101,11 @@ const [hookBefore, hookAfter] = t(locale, 'hookText').split('{table}')
     <div class="tile t-hook s12">
       <div class="hook__head">
         <h2 id="wh-h">{t(locale, 'hookHeading')}</h2>
-        <p class="hook__stamp"><span class="led led--yellow" aria-hidden="true"></span>{t(locale, 'hookStamp')}</p>
+        <p class="hook__stamp"><span class="led led--green" aria-hidden="true"></span>{t(locale, 'hookStamp')}</p>
       </div>
       <p>{hookBefore}<span class="host">webhook-events</span>{hookAfter}</p>
       <div data-owner="Code">
-        <Hud o="Code" f="demo rows · webhook-events later" />
+        <Hud o="Code" f="webhook-events · read at build" />
         <table class="hook">
           <caption class="sr-only">{t(locale, 'hookCaption')}</caption>
           <thead>
@@ -115,14 +116,15 @@ const [hookBefore, hookAfter] = t(locale, 'hookText').split('{table}')
           </thead>
           <tbody>
             {
-              HOOKS.map(([topic, at, status, led, action]) => (
+              hooks.map((h) => (
                 <tr>
-                  <td>shopify</td><td>{topic}</td><td>{at}</td>
-                  <td><span class="st"><span class={led} aria-hidden="true" />{status}</span></td>
-                  <td>{t(locale, action)}</td>
+                  <td>shopify</td><td>{h.topic}</td><td>{utc(h.createdAt)}</td>
+                  <td><span class="st"><span class={REBUILD[h.rebuild][0]} aria-hidden="true" />{h.rebuild}</span></td>
+                  <td>{h.summary ? `${h.summary} · ` : ''}{t(locale, REBUILD[h.rebuild][1])}</td>
                 </tr>
               ))
             }
+            {!hooks.length && <tr><td colspan="5">{t(locale, 'hookEmpty')}</td></tr>}
           </tbody>
         </table>
       </div>
