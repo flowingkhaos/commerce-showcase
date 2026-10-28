@@ -67,3 +67,15 @@ CMS's `store` domain must hold the Worker's address in `domains.url`.
 - A `POST` must come from this site (`Origin`), with a body under 64 KiB.
 - Cart writes and previews: 30 requests a minute per IP, then `429` with a JSON body naming the
   route (Workers rate-limit binding `LIMITER`).
+
+## Store content
+
+The store's own words live in the CMS (domain `store`): the home page blocks, the menus and the
+footer. [`content/seed-cms.ts`](content/seed-cms.ts) writes them over the CMS REST API with an
+admin API key, matching documents by (domain, locale, slug), so it is safe to re-run:
+
+```sh
+bun --env-file=/path/to/cms-admin.env apps/web/content/seed-cms.ts   # needs SHOWCASE_CMS_API_KEY
+```
+
+After a first seed, edit the words in the CMS admin: the next build picks them up.
