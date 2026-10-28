@@ -48,7 +48,7 @@ export const fr: Record<keyof Dict, string> = {
   morePhotos: 'Plus de photos : {title}',
   xsHeading: 'Trois propriétaires construisent cette page.',
   xsShopify: 'titre, prix, variantes, stock, photos, caractéristiques, produits liés',
-  xsPayload: 'le récit du produit, la navigation et le pied de page, quand le CMS aura ces champs',
+  xsPayload: 'la navigation, le pied de page, et le récit quand il est écrit',
   xsCode: 'le sac et cette bande',
   storeCode: 'Code du magasin',
   specs: 'Caractéristiques',

@@ -1,90 +1,112 @@
 ---
-// The collections strip (R4 Home board): Bank A, a dense list over its photo, beside Bank B, photo
-// channels. Store code until the CMS has a collectionList block. Titles and photos are Shopify's;
-// the line under each title lists Shopify's product names (Payload's collection copy doesn't
-// exist yet).
+// The collections strip (R4 Home board), drawn from a Payload `collectionList` block: Payload
+// picks the collections, orders them and writes a line for each; Shopify owns the title, the
+// photo and the price. The board's two banks follow Shopify: a collection inside the first top
+// collection (Apparel) joins Bank A, a dense list over its photo; the rest join Bank B, photo
+// channels. An unknown handle is skipped.
 import { localePath, t, type Locale } from '../i18n'
 import { lowestPrice, price, shopifyImageUrl, srcSet } from '../lib/format'
-import { getBanks } from '../lib/shopify'
+import { getBanks, getCollections } from '../lib/shopify'
 import Hud from './Hud'
 import Plate from './Plate.astro'
 
 interface Props {
   locale: Locale
+  heading?: string | null
+  items: { handle: string; description?: string | null }[]
 }
-const { locale } = Astro.props
-const [a, b] = await getBanks(locale)
+const { locale, heading, items } = Astro.props
+const [all, banks] = await Promise.all([getCollections(locale), getBanks(locale)])
+const [a, b] = banks as [(typeof banks)[number], (typeof banks)[number]]
+const rows = items.flatMap((it) => {
+  const c = all.find((x) => x.handle === it.handle)
+  return c ? [{ c, description: it.description }] : []
+})
+const inA = (handle: string) => a.top.handle === handle || a.subs.some((s) => s.handle === handle)
+const rowsA = rows.filter((r) => inA(r.c.handle))
+const rowsB = rows.filter((r) => !inA(r.c.handle))
 const ml = t(locale, 'moneyLocale')
 const priced = (products: Parameters<typeof lowestPrice>[0]) => {
   const { lowest, from } = lowestPrice(products)
   return { amount: price(lowest, ml, true), from }
 }
 const href = (handle: string) => localePath(locale, `/collections/${handle}`)
+// Payload's line when it wrote one; otherwise Shopify's product names, owned by Shopify.
+const line = (r: (typeof rows)[number]) =>
+  r.description
+    ? { owner: 'Payload' as const, text: r.description }
+    : { owner: 'Shopify' as const, text: r.c.products.nodes.map((n) => n.title).join(', ') }
+const Heading = heading ? 'h2' : null
 ---
-<section class="row" id="collections" aria-labelledby="col-h">
-  <div class="tile t-bankA s4">
-    <h2 id="col-h">{t(locale, 'collections')}</h2>
-    <h3 class="bank-h">{t(locale, 'bankA')} · <span data-owner="Shopify">{a!.top.title}</span></h3>
-    <ul>
-      {
-        a!.subs.map((c, i) => {
-          const p = priced(c.products.nodes)
-          // The first row carries the callouts (board: lrow--x); the others share its owners.
-          const x = i === 0
-          return (
-            <li>
-              <a class:list={['lrow', x && 'lrow--x']} href={href(c.handle)}>
-                <span class="jack" aria-hidden="true" />
-                <span class="lrow__t" data-owner="Shopify">{x && <Hud o="Shopify" f="collection.title" />}{c.title}</span>
-                <span class="lrow__d" data-owner="Shopify">{x && <Hud o="Shopify" f="collection.products · Payload copy later" />}{c.products.nodes.map((n) => n.title).join(', ')}</span>
-                <span class="lrow__p" data-owner="Shopify">{x && <Hud o="Shopify" f="minVariantPrice" />}{p.from && t(locale, 'from')} <b>{p.amount}</b></span>
-              </a>
-            </li>
-          )
-        })
-      }
-    </ul>
-    {
-      a!.top.image && (
-        <figure class="bankA__art fig" data-owner="Shopify">
-          <Hud o="Shopify" f="collection.image" at="in" />
-          <div class="fill">
-            <div class="film">
-              <img src={shopifyImageUrl(a!.top.image.url, 640)} srcset={srcSet(a!.top.image.url, 640)} alt={a!.top.image.altText ?? ''} loading="lazy" decoding="async" />
-            </div>
-          </div>
-        </figure>
-      )
-    }
-  </div>
-  <div class="tile t-bankB s8">
-    <h3 class="bank-h">{t(locale, 'bankB')} · <span data-owner="Shopify">{b!.top.title}</span></h3>
-    <ul class="cards">
-      {
-        b!.subs.map((c, i) => {
-          const p = priced(c.products.nodes)
-          return (
-            <li>
-              <a class="card" href={href(c.handle)}>
-                <figure class="fig" data-owner="Shopify">
-                  {i === 0 && <Hud o="Shopify" f="collection.image" at="in" />}
-                  {/* A collection with no Shopify photo gets the honest empty frame, like a product. */}
-                  {c.image ? (
-                    <div class="film">
-                      <img src={shopifyImageUrl(c.image.url, 560)} srcset={srcSet(c.image.url, 560)} alt={c.image.altText ?? ''} loading="lazy" decoding="async" />
-                    </div>
-                  ) : (
-                    <Plate title={c.title} locale={locale} />
-                  )}
-                </figure>
-                <span class="card__t" data-owner="Shopify">{c.title}</span>
-                <span class="card__p" data-owner="Shopify">{p.from && t(locale, 'from')} <b>{p.amount}</b></span>
-                <span class="card__d" data-owner="Shopify">{c.products.nodes.map((n) => n.title).join(', ')}</span>
-              </a>
-            </li>
-          )
-        })
-      }
-    </ul>
-  </div>
-</section>
+{
+  rows.length > 0 && (
+    <section class="row" id="collections" aria-labelledby={heading ? 'col-h' : undefined}>
+      {rowsA.length > 0 && (
+        <div class:list={['tile t-bankA', rowsB.length ? 's4' : 's12']}>
+          {Heading && <h2 id="col-h" data-owner="Payload"><Hud o="Payload" f="collectionList.heading" />{heading}</h2>}
+          <h3 class="bank-h">{t(locale, 'bankA')} · <span data-owner="Shopify">{a.top.title}</span></h3>
+          <ul>
+            {rowsA.map((r, i) => {
+              const p = priced(r.c.products.nodes)
+              const d = line(r)
+              // The first row carries the callouts (board: lrow--x); the others share its owners.
+              const x = i === 0
+              return (
+                <li>
+                  <a class:list={['lrow', x && 'lrow--x']} href={href(r.c.handle)}>
+                    <span class="jack" aria-hidden="true" />
+                    <span class="lrow__t" data-owner="Shopify">{x && <Hud o="Shopify" f="collection.title" />}{r.c.title}</span>
+                    <span class="lrow__d" data-owner={d.owner}>{x && <Hud o={d.owner} f={d.owner === 'Payload' ? 'collectionList.description' : 'collection.products'} />}{d.text}</span>
+                    <span class="lrow__p" data-owner="Shopify">{x && <Hud o="Shopify" f="minVariantPrice" />}{p.from && t(locale, 'from')} <b>{p.amount}</b></span>
+                  </a>
+                </li>
+              )
+            })}
+          </ul>
+          {a.top.image && (
+            <figure class="bankA__art fig" data-owner="Shopify">
+              <Hud o="Shopify" f="collection.image" at="in" />
+              <div class="fill">
+                <div class="film">
+                  <img src={shopifyImageUrl(a.top.image.url, 640)} srcset={srcSet(a.top.image.url, 640)} alt={a.top.image.altText ?? ''} loading="lazy" decoding="async" />
+                </div>
+              </div>
+            </figure>
+          )}
+        </div>
+      )}
+      {rowsB.length > 0 && (
+        <div class:list={['tile t-bankB', rowsA.length ? 's8' : 's12']}>
+          {Heading && !rowsA.length && <h2 id="col-h" data-owner="Payload"><Hud o="Payload" f="collectionList.heading" />{heading}</h2>}
+          <h3 class="bank-h">{t(locale, 'bankB')} · <span data-owner="Shopify">{b.top.title}</span></h3>
+          <ul class="cards">
+            {rowsB.map((r, i) => {
+              const p = priced(r.c.products.nodes)
+              const d = line(r)
+              return (
+                <li>
+                  <a class="card" href={href(r.c.handle)}>
+                    <figure class="fig" data-owner="Shopify">
+                      {i === 0 && <Hud o="Shopify" f="collection.image" at="in" />}
+                      {/* A collection with no Shopify photo gets the honest empty frame, like a product. */}
+                      {r.c.image ? (
+                        <div class="film">
+                          <img src={shopifyImageUrl(r.c.image.url, 560)} srcset={srcSet(r.c.image.url, 560)} alt={r.c.image.altText ?? ''} loading="lazy" decoding="async" />
+                        </div>
+                      ) : (
+                        <Plate title={r.c.title} locale={locale} />
+                      )}
+                    </figure>
+                    <span class="card__t" data-owner="Shopify">{r.c.title}</span>
+                    <span class="card__p" data-owner="Shopify">{p.from && t(locale, 'from')} <b>{p.amount}</b></span>
+                    <span class="card__d" data-owner={d.owner}>{d.text}</span>
+                  </a>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+    </section>
+  )
+}

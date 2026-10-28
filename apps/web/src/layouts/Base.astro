@@ -1,15 +1,15 @@
 ---
 // The page shell from the Marquee Wall boards: showcase bar, nav, the wall, the dense footer
-// under the giant OVRLD sign-off, and the bag. Nav and footer labels are store code for now:
-// Payload's `site` global doesn't exist yet, so they say data-owner="Code".
+// under the giant OVRLD sign-off, and the bag. Nav and footer come from Payload's `site` doc;
+// the dictionaries stand in only when that read fails (and the callouts then say "Code").
 import { getShopifyScriptTags } from '@shopify/hydrogen'
 import { PUBLIC_STORE_DOMAIN } from 'astro:env/server'
 import CartDrawer, { BagButton } from '../components/Bag'
 import Hud, { type Owner } from '../components/Hud'
 import { localePath, t, type Locale } from '../i18n'
-import { CMS_ADMIN } from '../lib/cms'
+import { CMS_ADMIN, getSite, type SiteLink } from '../lib/cms'
 import { marketFor } from '../lib/market'
-import { getBanks, getShopId } from '../lib/shopify'
+import { getShopId } from '../lib/shopify'
 import '../styles/wall.css'
 
 interface Props {
@@ -25,7 +25,12 @@ interface Props {
 }
 const { locale, title, description, paths, noindex = false, cartInitial, mainClass = 'wrap wall' } = Astro.props
 const other: Locale = locale === 'fr' ? 'en' : 'fr'
-const [banks, shopId] = await Promise.all([getBanks(locale), getShopId()])
+// On a Worker route (/cart, /preview) a sleeping CMS must not hold the page: wait briefly, then
+// fall back. The build waits as long as a cold start needs.
+const [site, shopId] = await Promise.all([
+  getSite(locale, Astro.isPrerendered ? undefined : 2500).catch(() => null),
+  getShopId(),
+])
 const { country, language } = marketFor(locale)
 
 // Only Shopify's runtime bootstrap and Standard Actions (the cart's transport). Analytics,
@@ -37,19 +42,45 @@ const shopifyTags = getShopifyScriptTags({
 }).scripts.filter((s) => ['shopify-global-bootstrap', 'shopify-standard-actions'].includes(String(s.attributes?.id)))
 
 const L = (path: string) => localePath(locale, path)
-const nav = [
-  { href: L('/collections/apparel'), label: t(locale, 'navApparel') },
-  { href: L('/collections/equipment'), label: t(locale, 'navEquipment') },
-  { href: `${L('/')}#collections`, label: t(locale, 'navCollections') },
-  { href: L('/how-it-works'), label: t(locale, 'navHow') },
-  { href: L('/docs'), label: t(locale, 'navDocs') },
-]
+const owner: Owner = site ? 'Payload' : 'Code'
+const nav: SiteLink[] = site
+  ? (site.nav ?? [])
+  : [
+      { url: L('/collections/apparel'), label: t(locale, 'navApparel') },
+      { url: L('/collections/equipment'), label: t(locale, 'navEquipment') },
+      { url: `${L('/')}#collections`, label: t(locale, 'navCollections') },
+      { url: L('/how-it-works'), label: t(locale, 'navHow') },
+      { url: L('/docs'), label: t(locale, 'navDocs') },
+    ]
+const footer = site
+  ? (site.footer ?? [])
+  : [
+      { heading: t(locale, 'footShop'), links: nav.slice(0, 3) },
+      {
+        heading: t(locale, 'footShowcase'),
+        links: [
+          { url: CMS_ADMIN, label: t(locale, 'openCms') },
+          { url: L('/how-it-works'), label: t(locale, 'footHow') },
+          { url: L('/docs'), label: t(locale, 'navDocs') },
+        ],
+      },
+      {
+        heading: t(locale, 'footRunsOn'),
+        links: [
+          { url: 'https://astro.build', label: 'Astro' },
+          { url: 'https://payloadcms.com', label: 'Payload' },
+          { url: 'https://shopify.dev', label: 'Shopify' },
+        ],
+      },
+    ]
+const footerNote = site ? site.footerNote : t(locale, 'legalNote')
 
 // The X-ray legend counts the callouts on this page. The body renders first so the count is in
 // the HTML: the switch is a checkbox, and the legend works without JavaScript.
 const body = await Astro.slots.render('default')
 const OWNERS: Owner[] = ['Payload', 'Shopify', 'Code']
-const CHROME: Record<Owner, number> = { Payload: 0, Shopify: 1, Code: 2 } // nav, bag count, footer
+// The chrome's own callouts: nav, footer (Payload's or the fallback's) and the bag count.
+const CHROME: Record<Owner, number> = { Payload: site ? 2 : 0, Shopify: 1, Code: site ? 0 : 2 }
 const counts = OWNERS.map((o) => ({
   o,
   n: CHROME[o] + (body.match(new RegExp(`class="hud[^"]*" aria-hidden="true"><b>${o}</b>`, 'g'))?.length ?? 0),
@@ -111,10 +142,10 @@ const pad = (n: number) => String(n).padStart(2, '0')
       <header class="nav-wrap">
         <nav class="nav wrap" aria-label={t(locale, 'navLabel')}>
           <a class="wordmark" href={L('/')} aria-label={t(locale, 'homeLabel')}>OVRLD</a>
-          <div class="nav__group" data-owner="Code">
-            <Hud o="Code" f="nav labels · Payload's site global later" at="below" />
+          <div class="nav__group" data-owner={owner}>
+            <Hud o={owner} f={site ? 'site.nav' : 'nav · dictionaries, the site read failed'} at="below" />
             <ul class="nav__links">
-              {nav.map((n) => <li><a href={n.href}><span class="led" aria-hidden="true" />{n.label}</a></li>)}
+              {nav.map((n) => <li><a href={n.url}><span class="led" aria-hidden="true" />{n.label}</a></li>)}
             </ul>
           </div>
           <div class="nav__end">
@@ -141,7 +172,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
               </summary>
               <div class="menu__panel">
                 <ul>
-                  {nav.map((n) => <li><a href={n.href}><span class="led" aria-hidden="true" />{n.label}</a></li>)}
+                  {nav.map((n) => <li><a href={n.url}><span class="led" aria-hidden="true" />{n.label}</a></li>)}
                 </ul>
                 <div class="lang" role="group" aria-label={t(locale, 'language')}>
                   <a href={paths.en} lang="en" hreflang="en" aria-current={locale === 'en' ? 'page' : undefined}><span class="led" aria-hidden="true" />EN</a>
@@ -162,50 +193,34 @@ const pad = (n: number) => String(n).padStart(2, '0')
         <div class="row">
           <div class="tile t-util s12">
             <div class="util__go" data-owner="Code">
-              <Hud o="Code" f="footer labels · Payload's site global later" />
               <a class="foot__mark" href={L('/')} aria-label={t(locale, 'homeLabel')}>OVRLD</a>
               <div class="acts">
                 <a class="cta" href={CMS_ADMIN}>{t(locale, 'openCms')} <small>{t(locale, 'openCmsSub')}</small></a>
                 <a class="ghost" href={L('/docs')}><span class="led" aria-hidden="true"></span>{t(locale, 'readDocs')}</a>
               </div>
             </div>
-            <div class="foot__cols" data-owner="Code">
-              <nav aria-label={t(locale, 'footShop')}>
-                <h2>{t(locale, 'footShop')}</h2>
-                <ul>{nav.map((n) => <li><a href={n.href}>{n.label}</a></li>)}</ul>
-              </nav>
+            <div class="foot__cols" data-owner={owner}>
+              <Hud o={owner} f={site ? 'site.footer' : 'footer · dictionaries, the site read failed'} />
               {
-                banks.map(({ top, subs }) => (
-                  <nav aria-label={t(locale, 'footCollectionsOf', { title: top.title })}>
-                    <h2 data-owner="Shopify">{top.title}</h2>
-                    <ul>{subs.map((c) => <li><a href={L(`/collections/${c.handle}`)} data-owner="Shopify">{c.title}</a></li>)}</ul>
+                footer.map((col) => (
+                  <nav aria-label={col.heading}>
+                    <h2>{col.heading}</h2>
+                    <ul>{(col.links ?? []).map((l) => <li><a href={l.url}>{l.label}</a></li>)}</ul>
                   </nav>
                 ))
               }
-              <nav aria-label={t(locale, 'footShowcase')}>
-                <h2>{t(locale, 'footShowcase')}</h2>
-                <ul>
-                  <li><a href={CMS_ADMIN}>{t(locale, 'openCms')}</a></li>
-                  <li><a href={L('/how-it-works')}>{t(locale, 'footHow')}</a></li>
-                  <li><a href={L('/docs')}>{t(locale, 'navDocs')}</a></li>
-                  <li><label for="xray">{t(locale, 'xray')}</label></li>
-                </ul>
-              </nav>
-              <nav aria-label={t(locale, 'footStore')}>
+              <nav aria-label={t(locale, 'footStore')} data-owner="Code">
                 <h2>{t(locale, 'footStore')}</h2>
                 <ul>
                   <li><a href={L('/cart')}>{t(locale, 'bag')}</a></li>
                   <li><a href={paths[other]} lang={other} hreflang={other}>{t(locale, 'otherLang')}</a></li>
+                  <li><label for="xray">{t(locale, 'xray')}</label></li>
                 </ul>
               </nav>
-              <div>
-                <h2>{t(locale, 'footRunsOn')}</h2>
-                <ul><li><span>Astro</span></li><li><span>Payload 4</span></li><li><span>Shopify</span></li></ul>
-              </div>
             </div>
-            <div class="legal" data-owner="Code">
-              <p>{t(locale, 'legal')}</p>
-              <p>{t(locale, 'legalNote')}</p>
+            <div class="legal">
+              <p data-owner="Code">{t(locale, 'legal')}</p>
+              {footerNote && <p data-owner={owner}>{footerNote}</p>}
             </div>
           </div>
         </div>

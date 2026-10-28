@@ -1,5 +1,5 @@
 // Writes .dev.vars (read by wrangler dev and, through the Cloudflare adapter, by the build)
-// from an operator env file that uses the SHOPIFY_* names. Values are never printed.
+// from an env file that uses the SHOPIFY_* names. Values are never printed.
 // Usage: node scripts/dev-vars.mjs <path to env file>
 import { readFileSync, writeFileSync } from 'node:fs'
 

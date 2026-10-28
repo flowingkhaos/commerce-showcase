@@ -1090,6 +1090,9 @@ a.key{ text-decoration: none; }
 .add:disabled{ color: var(--fg-3); border-color: var(--line); background: transparent; cursor: not-allowed; }
 .add:disabled:active{ scale: none; }
 .stock .led--yellow{ background: var(--led-yellow); }
+/* product badges (Payload): the domain chip's look, at most three */
+.badges{ display: flex; flex-wrap: wrap; gap: var(--s1); }
+.badges li{ display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; border-radius: 999px; border: var(--border) solid var(--line-2); font: 400 12.5px/1 var(--f-mono); }
 
 /* Payload's richText html arrives wrapped in one div; its children take the board's .rich rhythm */
 .rich .payload-richtext{ display: contents; }

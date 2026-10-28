@@ -1,17 +1,10 @@
 ---
-// Product (R4 Product board): gallery beside the pinned buy box, the x-ray strip (static copy
-// until phase 2's switch), specs from Shopify metafields, related products from Shopify's
-// recommendations. Payload's product story waits for the CMS `products` collection.
-import Acts from '../../../components/Acts.astro'
-import Hud from '../../../components/Hud'
-import Plate from '../../../components/Plate.astro'
-import ProductForm from '../../../components/ProductForm'
-import ProductTile from '../../../components/ProductTile.astro'
-import { localeFromParam, localePath, t, type Key } from '../../../i18n'
+// Product: Shopify's facts plus Payload's story, prerendered for every handle in both languages.
+import ProductView from '../../../components/ProductView.astro'
+import { localeFromParam } from '../../../i18n'
 import Base from '../../../layouts/Base.astro'
-import { CMS_ADMIN } from '../../../lib/cms'
-import { ghost, swatch } from '../../../lib/format'
-import { formProduct, getHandles, getProduct } from '../../../lib/shopify'
+import { getProductStories } from '../../../lib/cms'
+import { getHandles, getProduct } from '../../../lib/shopify'
 
 export async function getStaticPaths() {
   return (await getHandles()).flatMap((handle) => [{ params: { lang: undefined, handle } }, { params: { lang: 'fr', handle } }])
@@ -19,112 +12,17 @@ export async function getStaticPaths() {
 
 const locale = localeFromParam(Astro.params.lang)!
 const handle = Astro.params.handle!
-const { product, productRecommendations } = await getProduct(locale, handle)
+const [{ product, productRecommendations }, stories] = await Promise.all([getProduct(locale, handle), getProductStories(locale)])
 if (!product) throw new Error(`Shopify: product "${handle}" vanished during the build`)
-
-const path = localePath(locale, `/products/${handle}`)
-const [main, ...more] = product.images.nodes
-const SPEC_LABELS: Record<string, Key> = {
-  fabric: 'specFabric',
-  weight: 'specWeight',
-  fit: 'specFit',
-  details: 'specDetails',
-  care: 'specCare',
-}
-const specs = product.specs.flatMap((m) => (m?.value ? [{ key: m.key, label: t(locale, SPEC_LABELS[m.key]!), value: m.value }] : []))
-const choices = product.options.filter((o) => o.optionValues.length > 1)
-const related = productRecommendations?.slice(0, 3) ?? []
+// No story doc for this handle and language: the section is simply absent.
+const story = stories.find((s) => s.slug === handle) ?? null
 ---
 <Base
   locale={locale}
-  title={`${product.title} — OVRLD`}
+  title={story?.meta?.title ?? `${product.title} — OVRLD`}
+  description={story?.meta?.description}
   paths={{ en: `/products/${handle}`, fr: `/fr/products/${handle}` }}
   noindex
 >
-  <section class="row" aria-labelledby="pdp-h">
-    <div class="tile t-gal s7">
-      <figure class="fig" data-owner="Shopify">
-        <Hud o="Shopify" f={main ? 'product.images' : 'product.images · none yet'} at="in" />
-        <Plate image={main} title={product.title} tag={product.summary?.value} locale={locale} width={900} eager />
-      </figure>
-      {
-        more.length > 0 && (
-          <ul class="gal__more" aria-label={t(locale, 'morePhotos', { title: product.title })}>
-            {more.slice(0, 3).map((img) => (
-              <li><figure class="fig" data-owner="Shopify"><Plate image={img} title={product.title} locale={locale} width={320} /></figure></li>
-            ))}
-          </ul>
-        )
-      }
-    </div>
-    <div class="tile t-buy s5">
-      <h1 id="pdp-h" data-owner="Shopify"><Hud o="Shopify" f="product.title" />{product.title}</h1>
-      <ProductForm client:load product={formProduct(product)} locale={locale} layout="buy" path={path} />
-      <div class="hudband"><p data-owner="Code"><b>Code</b><span>{path}</span><span>{t(locale, 'routeWebhook')}</span></p></div>
-    </div>
-  </section>
-
-  <section class="row" aria-labelledby="xs-h">
-    <div class="tile t-xs s12">
-      <h2 id="xs-h" data-owner="Code"><Hud o="Code" f="x-ray strip" />{t(locale, 'xsHeading')}</h2>
-      <ul class="xs__keys">
-        <li data-k="Shopify"><b>Shopify</b>{t(locale, 'xsShopify')}</li>
-        <li data-k="Payload"><b>Payload</b>{t(locale, 'xsPayload')}</li>
-        <li data-k="Code"><b>{t(locale, 'storeCode')}</b>{t(locale, 'xsCode')}</li>
-      </ul>
-      <label class="xray-big" for="xray"><span class="led" aria-hidden="true"></span><span class="xb-off">{t(locale, 'xrayTurnOn')}</span><span class="xb-on">{t(locale, 'xrayTurnOff')}</span></label>
-    </div>
-  </section>
-
-  <section class="row" aria-labelledby="specs-h">
-    <div class="tile t-specs s12">
-      <h2 id="specs-h">{t(locale, 'specs')}</h2>
-      <div data-owner="Shopify">
-        <Hud o="Shopify" f="product.metafields · specs" />
-        <dl class="specs">
-          {specs.length === 0 && product.summary?.value && <div><dt>{t(locale, 'specSummary')}</dt><dd>{product.summary.value}</dd></div>}
-          {
-            specs.map((s) => (
-              <div>
-                <dt>{s.label}</dt>
-                <dd>{s.key === 'weight' ? <span class="readout readout--sm" data-ghost={ghost(s.value)}><span>{s.value}</span></span> : s.value}</dd>
-              </div>
-            ))
-          }
-          {
-            choices.map((o) => {
-              const colours = o.optionValues.map((v) => ({ name: v.name, sw: swatch(v.name, v.swatch?.color) }))
-              return colours.every((c) => c.sw) ? (
-                <div>
-                  <dt>{o.name}</dt>
-                  <dd class="swatches">{colours.map((c) => <span><span class="sw" style={`--sw: ${c.sw}`} aria-hidden="true" />{c.name}</span>)}</dd>
-                </div>
-              ) : (
-                <div><dt>{o.name}</dt><dd class="mono">{o.optionValues.map((v) => v.name).join(' · ')}</dd></div>
-              )
-            })
-          }
-          <div><dt>{t(locale, 'specStock')}</dt><dd>{product.availableForSale ? t(locale, 'inStockTest') : t(locale, 'soldOut')}</dd></div>
-        </dl>
-      </div>
-    </div>
-  </section>
-
-  <section class="row" aria-labelledby="rel-h">
-    <h2 id="rel-h" class="sr-only">{t(locale, 'related')}</h2>
-    {related.map((p) => <ProductTile product={p} locale={locale} span="s6" level="h3" field="productRecommendations" />)}
-    <div class="tile t-how s6">
-      <div class="beams" aria-hidden="true"><div class="beams__sweep"></div></div>
-      <h2 id="how-h" data-owner="Code"><Hud o="Code" f="how-it-works link" />{t(locale, 'howHeading')}</h2>
-      <p>{t(locale, 'howText')}</p>
-      <Acts
-        links={[
-          { label: t(locale, 'openCms'), sub: t(locale, 'openCmsSub'), url: CMS_ADMIN, style: 'primary' },
-          { label: t(locale, 'footHow'), url: localePath(locale, '/how-it-works'), style: 'secondary' },
-        ]}
-        owner="Code"
-        field="showcase links"
-      />
-    </div>
-  </section>
+  <ProductView locale={locale} product={product} recommendations={productRecommendations} story={story} />
 </Base>

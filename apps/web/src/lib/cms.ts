@@ -17,6 +17,7 @@ export type Block =
   | { blockType: 'faq'; id: string; heading?: string | null; items?: { question: string; answer: string }[] }
   | { blockType: 'banner'; id: string; style: 'info' | 'success' | 'warning'; text: string; link?: { label?: string | null; url?: string | null } | null }
   | { blockType: 'productGrid'; id: string; heading?: string | null; collectionHandle: string; limit: number }
+  | { blockType: 'collectionList'; id: string; heading?: string | null; items?: { handle: string; description?: string | null }[] }
 
 export type Page = {
   title: string
@@ -36,15 +37,27 @@ export type Doc = {
   translationOf?: { id: number; slug: string; locale: Locale } | null
   updatedAt: string
 }
+export type SiteLink = { label: string; url: string }
+/** One per (domain, locale): the nav, the footer columns and the note under them. */
+export type Site = { nav?: SiteLink[] | null; footer?: { heading: string; links?: SiteLink[] | null }[] | null; footerNote?: string | null }
+/** A product's words; Shopify owns everything else. `slug` is the Shopify handle. */
+export type ProductStory = {
+  id: number
+  slug: string
+  locale: Locale
+  story?: Block[] | null
+  badges?: { label: string }[] | null
+  meta?: { title?: string | null; description?: string | null } | null
+}
 export type Domain = { slug: string; name: string; url?: string | null; kind: string; status: 'live' | 'planned' }
 
 // One read per document per build, however many pages ask for it. A failed read is not kept.
 const memo = new Map<string, Promise<unknown>>()
-async function get<T>(path: string, params: Record<string, string>): Promise<T> {
+async function get<T>(path: string, params: Record<string, string>, timeoutMs = TIMEOUT_MS): Promise<T> {
   const key = `${path}?${new URLSearchParams(params)}`
   if (!memo.has(key)) {
     const load = (async () => {
-      const res = await fetch(`${CMS_URL}${key}`, { signal: AbortSignal.timeout(TIMEOUT_MS) })
+      const res = await fetch(`${CMS_URL}${key}`, { signal: AbortSignal.timeout(timeoutMs) })
       // A failed read fails the build: an outage never ships as an empty page.
       if (!res.ok) throw new Error(`CMS: GET ${path} → ${res.status}`)
       return res.json()
@@ -70,6 +83,15 @@ export const getDocs = async (locale: Locale) =>
 export function counterpart(doc: Pick<Doc, 'id' | 'translationOf'>, others: Doc[]) {
   return others.find((d) => d.id === doc.translationOf?.id || d.translationOf?.id === doc.id) ?? null
 }
+
+/** The site doc for one language, or null. */
+export const getSite = async (locale: Locale, timeoutMs?: number) =>
+  (await get<{ docs: Site[] }>('/api/site', { 'where[domain.slug][equals]': DOMAIN, 'where[locale][equals]': locale, depth: '0' }, timeoutMs))
+    .docs[0] ?? null
+
+/** Every product story in one language (one read per build, then found by handle). */
+export const getProductStories = async (locale: Locale) =>
+  (await get<{ docs: ProductStory[] }>('/api/products', { ...inStore(locale), limit: '100' })).docs
 
 export const getDomains = async () => (await get<{ docs: Domain[] }>('/api/domains', { depth: '0', limit: '50' })).docs
 

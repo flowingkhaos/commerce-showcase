@@ -1,0 +1,132 @@
+---
+// The product page body (R4 Product board): gallery beside the pinned buy box, the x-ray strip,
+// Payload's story when the CMS has one for this handle and language, specs from Shopify
+// metafields, related products from Shopify's recommendations. Used by /products and /preview.
+import type { Locale } from '../i18n'
+import { localePath, t, type Key } from '../i18n'
+import { CMS_ADMIN, type ProductStory } from '../lib/cms'
+import { ghost, swatch } from '../lib/format'
+import { formProduct, type Card, type ProductData } from '../lib/shopify'
+import Acts from './Acts.astro'
+import Blocks from './Blocks.astro'
+import Hud from './Hud'
+import Plate from './Plate.astro'
+import ProductForm from './ProductForm'
+import ProductTile from './ProductTile.astro'
+
+interface Props {
+  locale: Locale
+  product: ProductData
+  recommendations?: Card[] | null
+  story?: ProductStory | null
+}
+const { locale, product, recommendations, story } = Astro.props
+const path = localePath(locale, `/products/${product.handle}`)
+const [main, ...more] = product.images.nodes
+const SPEC_LABELS: Record<string, Key> = {
+  fabric: 'specFabric',
+  weight: 'specWeight',
+  fit: 'specFit',
+  details: 'specDetails',
+  care: 'specCare',
+}
+const specs = product.specs.flatMap((m) => (m?.value ? [{ key: m.key, label: t(locale, SPEC_LABELS[m.key]!), value: m.value }] : []))
+const choices = product.options.filter((o) => o.optionValues.length > 1)
+const related = recommendations?.slice(0, 3) ?? []
+---
+<section class="row" aria-labelledby="pdp-h">
+    <div class="tile t-gal s7">
+      <figure class="fig" data-owner="Shopify">
+        <Hud o="Shopify" f={main ? 'product.images' : 'product.images · none yet'} at="in" />
+        <Plate image={main} title={product.title} tag={product.summary?.value} locale={locale} width={900} eager />
+      </figure>
+      {
+        more.length > 0 && (
+          <ul class="gal__more" aria-label={t(locale, 'morePhotos', { title: product.title })}>
+            {more.slice(0, 3).map((img) => (
+              <li><figure class="fig" data-owner="Shopify"><Plate image={img} title={product.title} locale={locale} width={320} /></figure></li>
+            ))}
+          </ul>
+        )
+      }
+    </div>
+    <div class="tile t-buy s5">
+      <h1 id="pdp-h" data-owner="Shopify"><Hud o="Shopify" f="product.title" />{product.title}</h1>
+      {
+        story?.badges?.length ? (
+          <ul class="badges" data-owner="Payload">
+            <Hud o="Payload" f="products.badges" />
+            {story.badges.map((b) => <li><span class="led led--blue" aria-hidden="true" />{b.label}</li>)}
+          </ul>
+        ) : null
+      }
+      <ProductForm client:load product={formProduct(product)} locale={locale} layout="buy" path={path} />
+      <div class="hudband"><p data-owner="Code"><b>Code</b><span>{path}</span><span>{t(locale, 'routeWebhook')}</span></p></div>
+    </div>
+  </section>
+
+  <section class="row" aria-labelledby="xs-h">
+    <div class="tile t-xs s12">
+      <h2 id="xs-h" data-owner="Code"><Hud o="Code" f="x-ray strip" />{t(locale, 'xsHeading')}</h2>
+      <ul class="xs__keys">
+        <li data-k="Shopify"><b>Shopify</b>{t(locale, 'xsShopify')}</li>
+        <li data-k="Payload"><b>Payload</b>{t(locale, 'xsPayload')}</li>
+        <li data-k="Code"><b>{t(locale, 'storeCode')}</b>{t(locale, 'xsCode')}</li>
+      </ul>
+      <label class="xray-big" for="xray"><span class="led" aria-hidden="true"></span><span class="xb-off">{t(locale, 'xrayTurnOn')}</span><span class="xb-on">{t(locale, 'xrayTurnOff')}</span></label>
+    </div>
+  </section>
+
+  {story?.story?.length ? <Blocks blocks={story.story} locale={locale} story /> : null}
+
+  <section class="row" aria-labelledby="specs-h">
+    <div class="tile t-specs s12">
+      <h2 id="specs-h">{t(locale, 'specs')}</h2>
+      <div data-owner="Shopify">
+        <Hud o="Shopify" f="product.metafields · specs" />
+        <dl class="specs">
+          {specs.length === 0 && product.summary?.value && <div><dt>{t(locale, 'specSummary')}</dt><dd>{product.summary.value}</dd></div>}
+          {
+            specs.map((s) => (
+              <div>
+                <dt>{s.label}</dt>
+                <dd>{s.key === 'weight' ? <span class="readout readout--sm" data-ghost={ghost(s.value)}><span>{s.value}</span></span> : s.value}</dd>
+              </div>
+            ))
+          }
+          {
+            choices.map((o) => {
+              const colours = o.optionValues.map((v) => ({ name: v.name, sw: swatch(v.name, v.swatch?.color) }))
+              return colours.every((c) => c.sw) ? (
+                <div>
+                  <dt>{o.name}</dt>
+                  <dd class="swatches">{colours.map((c) => <span><span class="sw" style={`--sw: ${c.sw}`} aria-hidden="true" />{c.name}</span>)}</dd>
+                </div>
+              ) : (
+                <div><dt>{o.name}</dt><dd class="mono">{o.optionValues.map((v) => v.name).join(' · ')}</dd></div>
+              )
+            })
+          }
+          <div><dt>{t(locale, 'specStock')}</dt><dd>{product.availableForSale ? t(locale, 'inStockTest') : t(locale, 'soldOut')}</dd></div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <section class="row" aria-labelledby="rel-h">
+    <h2 id="rel-h" class="sr-only">{t(locale, 'related')}</h2>
+    {related.map((p) => <ProductTile product={p} locale={locale} span="s6" level="h3" field="productRecommendations" />)}
+    <div class="tile t-how s6">
+      <div class="beams" aria-hidden="true"><div class="beams__sweep"></div></div>
+      <h2 id="how-h" data-owner="Code"><Hud o="Code" f="how-it-works link" />{t(locale, 'howHeading')}</h2>
+      <p>{t(locale, 'howText')}</p>
+      <Acts
+        links={[
+          { label: t(locale, 'openCms'), sub: t(locale, 'openCmsSub'), url: CMS_ADMIN, style: 'primary' },
+          { label: t(locale, 'footHow'), url: localePath(locale, '/how-it-works'), style: 'secondary' },
+        ]}
+        owner="Code"
+        field="showcase links"
+      />
+    </div>
+  </section>

@@ -5,9 +5,11 @@
 // frame-ancestors (the CMS only), no-store and noindex.
 import Blocks from '../components/Blocks.astro'
 import DocView from '../components/DocView.astro'
+import ProductView from '../components/ProductView.astro'
 import { t, type Locale } from '../i18n'
 import Base from '../layouts/Base.astro'
-import { CMS_ORIGIN, CMS_URL, counterpart, getDocs, type Doc, type Page } from '../lib/cms'
+import { CMS_ORIGIN, CMS_URL, counterpart, getDocs, type Doc, type Page, type ProductStory } from '../lib/cms'
+import { getProduct } from '../lib/shopify'
 
 export const prerender = false
 
@@ -21,8 +23,8 @@ const plain = (status: number) =>
 
 const params = Astro.url.searchParams
 const collection = params.get('collection')
-// Pages and docs have views here; articles do not (yet), nor products (no collection yet).
-if (collection !== 'pages' && collection !== 'docs') return plain(404)
+// Pages, docs and product stories have views here; articles do not (yet).
+if (collection !== 'pages' && collection !== 'docs' && collection !== 'products') return plain(404)
 
 let res: Response
 try {
@@ -38,14 +40,17 @@ try {
 if (res.status === 403 || res.status === 404) return plain(res.status)
 if (!res.ok) return plain(503)
 
-const draft = (await res.json()) as (Page | Doc) & { id: number; locale?: string; title: string }
+const draft = (await res.json()) as (Page | Doc | ProductStory) & { id: number; locale?: string; title?: string }
 const locale: Locale = draft.locale === 'fr' ? 'fr' : 'en'
 const docs = collection === 'docs' ? await getDocs(locale) : []
 const other = collection === 'docs' ? counterpart(draft as Doc, await getDocs(locale === 'fr' ? 'en' : 'fr')) : null
+// A product story previews inside its product page, with Shopify's data for the same handle.
+const shop = collection === 'products' ? await getProduct(locale, (draft as ProductStory).slug) : null
+if (collection === 'products' && !shop?.product) return plain(404)
 ---
 <Base
   locale={locale}
-  title={`${t(locale, 'draft')} ${draft.title} — OVRLD`}
+  title={`${t(locale, 'draft')} ${shop?.product?.title ?? draft.title ?? ''} — OVRLD`}
   paths={{ en: '/', fr: '/fr' }}
   noindex
   mainClass={collection === 'docs' ? 'wrap docs-frame' : 'wrap wall'}
@@ -58,6 +63,8 @@ const other = collection === 'docs' ? counterpart(draft as Doc, await getDocs(lo
   {
     collection === 'pages' ? (
       <Blocks blocks={(draft as Page).layout ?? []} locale={locale} />
+    ) : shop?.product ? (
+      <ProductView locale={locale} product={shop.product} recommendations={shop.productRecommendations} story={draft as ProductStory} />
     ) : (
       <DocView locale={locale} docs={docs} doc={draft as Doc} other={other} />
     )

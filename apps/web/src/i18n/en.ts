@@ -48,7 +48,7 @@ export const en = {
   morePhotos: 'More photos of the {title}',
   xsHeading: 'Three owners build this page.',
   xsShopify: 'title, price, variants, stock, photos, specs, related products',
-  xsPayload: 'the product story, the navigation and the footer, once the CMS has those fields',
+  xsPayload: 'the navigation, the footer, and the story when one is written',
   xsCode: 'the bag and this strip',
   storeCode: 'Store code',
   specs: 'Specs',

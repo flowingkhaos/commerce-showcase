@@ -1,8 +1,9 @@
 ---
 // A Payload page's blocks, in CMS order, each as its Marquee Wall tile. Section → block map from
 // the design lock: hero-marquee-tile `hero`, product halves `productGrid` (≤ 2 products),
-// how-it's-built tile `cta`, editorial story tile `mediaText`. `faq` and `banner` have no board
-// tile; they use the wall's vocabulary (see "store additions" in wall.css).
+// how-it's-built tile `cta`, editorial story tile `mediaText`, collections strip `collectionList`.
+// `faq` and `banner` have no board tile; they use the wall's vocabulary ("store additions" in
+// wall.css). A product's story uses the same renderer in `story` mode (R4 Product board).
 import { localePath, t, type Locale } from '../i18n'
 import { CMS_ADMIN, type Block } from '../lib/cms'
 import { getCollection, getProduct } from '../lib/shopify'
@@ -15,8 +16,11 @@ import ProductHalf from './ProductHalf.astro'
 interface Props {
   blocks: Block[]
   locale: Locale
+  /** A product's story: mediaText keeps its heading in the words tile, callouts name products.story. */
+  story?: boolean
 }
-const { blocks, locale } = Astro.props
+const { blocks, locale, story = false } = Astro.props
+const prefix = story ? 'products.story · ' : ''
 
 // Shopify reads first, so the markup below stays synchronous.
 const grids = new Map(
@@ -38,9 +42,6 @@ const grids = new Map(
     ),
   ),
 )
-// The collections strip follows the first productGrid until a CMS collectionList block exists.
-const firstGrid = blocks.findIndex((b) => b.blockType === 'productGrid')
-const stripAt = firstGrid === -1 ? blocks.length - 1 : firstGrid
 const firstHero = blocks.findIndex((b) => b.blockType === 'hero')
 
 // With no CMS links, the hero still carries the page's one action (design lock: "Open the CMS").
@@ -71,11 +72,11 @@ const SEGS = ['b', 'b', 'b', 'b', 'g', 'g', 'g', 'g', 'g', 'g', 'y', '', '', '']
                 )}
               </div>
               {i === firstHero ? (
-                <h1 id={`h-${b.id}`} data-owner="Payload"><Hud o="Payload" f="hero.heading" />{b.heading}</h1>
+                <h1 id={`h-${b.id}`} data-owner="Payload"><Hud o="Payload" f={`${prefix}hero.heading`} />{b.heading}</h1>
               ) : (
-                <h2 id={`h-${b.id}`} class="hero__h" data-owner="Payload"><Hud o="Payload" f="hero.heading" />{b.heading}</h2>
+                <h2 id={`h-${b.id}`} class="hero__h" data-owner="Payload"><Hud o="Payload" f={`${prefix}hero.heading`} />{b.heading}</h2>
               )}
-              {b.subheading && <p class="hero__sub" data-owner="Payload"><Hud o="Payload" f="hero.subheading" />{b.subheading}</p>}
+              {b.subheading && <p class="hero__sub" data-owner="Payload"><Hud o="Payload" f={`${prefix}hero.subheading`} />{b.subheading}</p>}
               {b.links?.length ? <Acts links={b.links} owner="Payload" field="hero.links" /> : <Acts links={fallbackLinks} owner="Code" field="fallback links · hero.links empty" />}
               {i === firstHero && (
                 <div class="hudband"><p data-owner="Code"><b>Code</b><span>{localePath(locale, '/')}</span><span>{t(locale, 'routeBuilt')}</span></p></div>
@@ -83,7 +84,7 @@ const SEGS = ['b', 'b', 'b', 'b', 'g', 'g', 'g', 'g', 'g', 'g', 'y', '', '', '']
             </div>
             {b.image && (
               <figure class="hero__shot fig" data-owner="Payload">
-                <Hud o="Payload" f="hero.image" at="in" />
+                <Hud o="Payload" f={`${prefix}hero.image`} at="in" />
                 <div class="ph"><img src={b.image.url} alt={b.image.alt} width={b.image.width ?? undefined} height={b.image.height ?? undefined} /></div>
               </figure>
             )}
@@ -94,7 +95,7 @@ const SEGS = ['b', 'b', 'b', 'b', 'g', 'g', 'g', 'g', 'g', 'g', 'y', '', '', '']
       {b.blockType === 'richText' && b.html && (
         <section class="row">
           <div class="tile t-text s12">
-            <div class="rich" data-owner="Payload"><Hud o="Payload" f="richText.html" /><Fragment set:html={b.html} /></div>
+            <div class="rich" data-owner="Payload"><Hud o="Payload" f={`${prefix}richText.html`} /><Fragment set:html={b.html} /></div>
           </div>
         </section>
       )}
@@ -103,29 +104,37 @@ const SEGS = ['b', 'b', 'b', 'b', 'g', 'g', 'g', 'g', 'g', 'g', 'y', '', '', '']
         (!b.image ? (
           <section class="row">
             <div class="tile t-text s12">
-              {b.heading && <h2 data-owner="Payload"><Hud o="Payload" f="mediaText.heading" />{b.heading}</h2>}
-              {b.html && <div class="rich" data-owner="Payload"><Hud o="Payload" f="mediaText.html" /><Fragment set:html={b.html} /></div>}
+              {b.heading && <h2 data-owner="Payload"><Hud o="Payload" f={`${prefix}mediaText.heading`} />{b.heading}</h2>}
+              {b.html && <div class="rich" data-owner="Payload"><Hud o="Payload" f={`${prefix}mediaText.html`} /><Fragment set:html={b.html} /></div>}
             </div>
           </section>
-        ) : b.imagePosition === 'left' ? (
+        ) : b.imagePosition === 'left' && !story ? (
           <section class="row" aria-labelledby={b.heading ? `m-${b.id}` : undefined}>
             <div class="tile sun s8" data-owner="Payload">
-              <Hud o="Payload" f="mediaText.image" at="in" />
+              <Hud o="Payload" f={`${prefix}mediaText.image`} at="in" />
               <div class="fill"><div class="film"><img src={b.image.url} alt={b.image.alt} loading="lazy" decoding="async" /></div></div>
-              {b.heading && <h2 id={`m-${b.id}`} data-owner="Payload"><Hud o="Payload" f="mediaText.heading" />{b.heading}</h2>}
+              {b.heading && <h2 id={`m-${b.id}`} data-owner="Payload"><Hud o="Payload" f={`${prefix}mediaText.heading`} />{b.heading}</h2>}
             </div>
-            <div class="tile t-text s4">{b.html && <div class="rich" data-owner="Payload"><Hud o="Payload" f="mediaText.html" /><Fragment set:html={b.html} /></div>}</div>
+            <div class="tile t-text s4">{b.html && <div class="rich" data-owner="Payload"><Hud o="Payload" f={`${prefix}mediaText.html`} /><Fragment set:html={b.html} /></div>}</div>
           </section>
         ) : (
           <section class="row" aria-labelledby={b.heading ? `m-${b.id}` : undefined}>
+            {story && b.imagePosition === 'left' && (
+              <div class="tile t-photo s8" data-owner="Payload">
+                <Hud o="Payload" f={`${prefix}mediaText.image`} at="in" />
+                <div class="fill"><div class="film"><img src={b.image.url} alt={b.image.alt} loading="lazy" decoding="async" /></div></div>
+              </div>
+            )}
             <div class="tile t-text s4">
-              {b.heading && <h2 id={`m-${b.id}`} data-owner="Payload"><Hud o="Payload" f="mediaText.heading" />{b.heading}</h2>}
-              {b.html && <div class="rich" data-owner="Payload"><Hud o="Payload" f="mediaText.html" /><Fragment set:html={b.html} /></div>}
+              {b.heading && <h2 id={`m-${b.id}`} data-owner="Payload"><Hud o="Payload" f={`${prefix}mediaText.heading`} />{b.heading}</h2>}
+              {b.html && <div class="rich" data-owner="Payload"><Hud o="Payload" f={`${prefix}mediaText.html`} /><Fragment set:html={b.html} /></div>}
             </div>
-            <div class="tile t-photo s8" data-owner="Payload">
-              <Hud o="Payload" f="mediaText.image" at="in" />
-              <div class="fill"><div class="film"><img src={b.image.url} alt={b.image.alt} loading="lazy" decoding="async" /></div></div>
-            </div>
+            {!(story && b.imagePosition === 'left') && (
+              <div class="tile t-photo s8" data-owner="Payload">
+                <Hud o="Payload" f={`${prefix}mediaText.image`} at="in" />
+                <div class="fill"><div class="film"><img src={b.image.url} alt={b.image.alt} loading="lazy" decoding="async" /></div></div>
+              </div>
+            )}
           </section>
         ))}
 
@@ -133,7 +142,7 @@ const SEGS = ['b', 'b', 'b', 'b', 'g', 'g', 'g', 'g', 'g', 'g', 'y', '', '', '']
         <section class="row">
           <div class="tile t-feat s12">
             <div class="t-feat__intro" data-owner="Payload">
-              <Hud o="Payload" f="featureList" />
+              <Hud o="Payload" f={`${prefix}featureList`} />
               {b.heading && <h2>{b.heading}</h2>}
               {b.intro && <p>{b.intro}</p>}
             </div>
@@ -154,8 +163,8 @@ const SEGS = ['b', 'b', 'b', 'b', 'g', 'g', 'g', 'g', 'g', 'g', 'y', '', '', '']
         <section class="row" aria-labelledby={`c-${b.id}`}>
           <div class="tile t-built s12">
             <div class="beams" aria-hidden="true"><div class="beams__sweep" /></div>
-            <h2 id={`c-${b.id}`} data-owner="Payload"><Hud o="Payload" f="cta.heading" />{b.heading}</h2>
-            {b.text && <p data-owner="Payload"><Hud o="Payload" f="cta.text" />{b.text}</p>}
+            <h2 id={`c-${b.id}`} data-owner="Payload"><Hud o="Payload" f={`${prefix}cta.heading`} />{b.heading}</h2>
+            {b.text && <p data-owner="Payload"><Hud o="Payload" f={`${prefix}cta.text`} />{b.text}</p>}
             {b.links?.length ? <Acts links={b.links} owner="Payload" field="cta.links" /> : null}
           </div>
         </section>
@@ -164,9 +173,9 @@ const SEGS = ['b', 'b', 'b', 'b', 'g', 'g', 'g', 'g', 'g', 'g', 'y', '', '', '']
       {b.blockType === 'faq' && (
         <section class="row">
           <div class="tile t-faq s12">
-            {b.heading && <h2 data-owner="Payload"><Hud o="Payload" f="faq.heading" />{b.heading}</h2>}
+            {b.heading && <h2 data-owner="Payload"><Hud o="Payload" f={`${prefix}faq.heading`} />{b.heading}</h2>}
             <div class="faq" data-owner="Payload">
-              <Hud o="Payload" f="faq.items" />
+              <Hud o="Payload" f={`${prefix}faq.items`} />
               {(b.items ?? []).map((item) => (
                 <details>
                   <summary><span class="led" aria-hidden="true" />{item.question}</summary>
@@ -181,7 +190,7 @@ const SEGS = ['b', 'b', 'b', 'b', 'g', 'g', 'g', 'g', 'g', 'g', 'y', '', '', '']
       {b.blockType === 'banner' && (
         <section class="row">
           <div class="tile t-banner s12" data-owner="Payload">
-            <Hud o="Payload" f="banner" />
+            <Hud o="Payload" f={`${prefix}banner`} />
             <p><span class={led[b.style] ?? 'led'} aria-hidden="true" />{b.text}</p>
             {b.link?.url && <a href={b.link.url}>{b.link.label || b.link.url}</a>}
           </div>
@@ -195,7 +204,7 @@ const SEGS = ['b', 'b', 'b', 'b', 'g', 'g', 'g', 'g', 'g', 'g', 'y', '', '', '']
           return (
             <>
               {b.heading && (
-                <section class="row"><div class="tile t-xs s12"><h2 data-owner="Payload"><Hud o="Payload" f="productGrid.heading" />{b.heading}</h2></div></section>
+                <section class="row"><div class="tile t-xs s12"><h2 data-owner="Payload"><Hud o="Payload" f={`${prefix}productGrid.heading`} />{b.heading}</h2></div></section>
               )}
               {g.halves.length ? (
                 <section class="row" aria-label={b.heading ?? t(locale, 'twoProducts')}>
@@ -208,7 +217,7 @@ const SEGS = ['b', 'b', 'b', 'b', 'g', 'g', 'g', 'g', 'g', 'g', 'y', '', '', '']
           )
         })()}
 
-      {i === stripAt && <CollectionsStrip locale={locale} />}
+      {b.blockType === 'collectionList' && <CollectionsStrip locale={locale} heading={b.heading} items={b.items ?? []} />}
     </>
   ))
 }

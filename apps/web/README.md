@@ -14,7 +14,9 @@ result as files. Only these routes run in the Worker, on each request:
 | `/preview` | Live preview of a CMS draft, for the CMS admin's frame only |
 
 English lives at `/`, French under `/fr`. Pages: home (the CMS `home` page), collections,
-products, docs (the CMS `docs` collection), how it works, 404.
+products, docs (the CMS `docs` collection), how it works, 404. The nav and footer come from the
+CMS `site` doc, and a product's story from the CMS `products` collection when one is written;
+Shopify owns titles, prices, stock, photos and the cart.
 
 ## Run it locally
 
@@ -44,10 +46,13 @@ wrangler reads it from the environment.
 
 ```sh
 export CLOUDFLARE_ACCOUNT_ID=…  CLOUDFLARE_API_TOKEN=…   # a token scoped to the one account
-npx wrangler secret put PUBLIC_STORE_DOMAIN
-npx wrangler secret put PRIVATE_STOREFRONT_API_TOKEN
-bun run deploy                                         # build, then wrangler deploy
+bun run deploy --secrets-file /path/outside/the/repo/secrets.json   # build, then wrangler deploy
 ```
+
+The secrets file is JSON with the Worker's two secrets, and it ships them with the deploy:
+`{ "PUBLIC_STORE_DOMAIN": "…", "PRIVATE_STOREFRONT_API_TOKEN": "…" }`. Keep it out of the
+repository. Deploy with them every time: the Worker checks its variables when it starts, and a
+deploy without them fails (`10021 EnvInvalidVariables`).
 
 The build needs the same two values (in `.dev.vars` or the environment). For live preview, the
 CMS's `store` domain must hold the Worker's address in `domains.url`.
