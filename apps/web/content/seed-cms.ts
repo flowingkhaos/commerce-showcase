@@ -31,6 +31,8 @@ const lexical = (...paragraphs: string[]) => ({
 const photos = {
   rack: { id: 'photo-1784798228092-659924b1a15b', alt: 'A power rack with a barbell and weight plates in an empty gym', credit: 'Mirko Meister, Unsplash' },
   homeGym: { id: 'photo-1786204413545-cc7f6d87a112', alt: 'A home gym with a wooden bench and large windows', credit: 'Aalo Lens, Unsplash' },
+  hood: { id: 'photo-1578470507807-3fc541d5f544', alt: 'A woman in a heather grey hoodie holding her hood at night', credit: 'Kartabya Aryal, Unsplash' },
+  gearWall: { id: 'photo-1771270786606-f5a0e57db762', alt: 'Training gear hung on a wooden wall', credit: 'Caroline Badran, Unsplash' },
 }
 
 async function media(p: { id: string; alt: string; credit: string }) {
@@ -60,6 +62,8 @@ async function upsert(collection: string, locale: 'en' | 'fr', slug: string, dat
 
 const rack = await media(photos.rack)
 const homeGym = await media(photos.homeGym)
+const hood = await media(photos.hood)
+const gearWall = await media(photos.gearWall)
 
 const home = (l: 'en' | 'fr') => {
   const en = l === 'en'
@@ -164,3 +168,63 @@ for (const l of ['en', 'fr'] as const) {
     : await api('site', { method: 'POST', body: JSON.stringify(doc) })
   console.log(`site ${l}`)
 }
+
+// Product stories: the words around a Shopify product (the slug is the Shopify handle).
+const hoodie = (l: 'en' | 'fr') => {
+  const en = l === 'en'
+  return {
+    badges: [],
+    story: [
+      {
+        blockType: 'mediaText',
+        heading: en ? 'For the cold start.' : 'Pour le démarrage à froid.',
+        richText: lexical(
+          en
+            ? 'The rack is cold first thing in the morning. Pull the hoodie on for the warm-up sets, take it off once you are moving, and put it back on for the walk inside.'
+            : 'La cage est froide au petit matin. Enfilez le kangourou pour les séries d’échauffement, retirez-le une fois lancé, et remettez-le pour rentrer.',
+        ),
+        image: hood,
+        imagePosition: 'right',
+      },
+      {
+        blockType: 'featureList',
+        heading: en ? 'One hoodie, three moments.' : 'Un kangourou, trois moments.',
+        intro: en ? 'Where it goes between the first set and the last.' : 'Où il va entre la première série et la dernière.',
+        items: en
+          ? [
+              { title: 'Before the first set', text: 'Hood up, hands in the kangaroo pocket, while the garage warms up.' },
+              { title: 'Between sets', text: 'Off and over the bench, back on when you rest.' },
+              { title: 'After the last set', text: 'Back on for the cool-down and the walk out of the garage.' },
+            ]
+          : [
+              { title: 'Avant la première série', text: 'Capuchon sur la tête, mains dans la poche kangourou, pendant que le garage se réchauffe.' },
+              { title: 'Entre les séries', text: 'Retiré et posé sur le banc, remis pendant le repos.' },
+              { title: 'Après la dernière série', text: 'Remis pour le retour au calme et la sortie du garage.' },
+            ],
+      },
+      {
+        blockType: 'mediaText',
+        heading: en ? 'It hangs with the gear.' : 'Rangé avec l’équipement.',
+        richText: lexical(
+          en
+            ? 'Keep it on the hook by the bands and the rings, next to the rack. Two colours, five sizes, one price.'
+            : 'Gardez-le au crochet près des élastiques et des anneaux, à côté de la cage. Deux couleurs, cinq tailles, un prix.',
+        ),
+        image: gearWall,
+        imagePosition: 'left',
+      },
+    ],
+    meta: {
+      title: en ? 'Heavyweight Hoodie · OVRLD' : 'Kangourou épais · OVRLD',
+      description: en
+        ? 'A heavyweight fleece hoodie for the cold start: on for the warm-up, off once you are moving.'
+        : 'Un kangourou en molleton épais pour le démarrage à froid : mis pour l’échauffement, retiré une fois lancé.',
+    },
+  }
+}
+const enHoodie = await upsert('products', 'en', 'heavyweight-hoodie', hoodie('en'))
+const frHoodie = await upsert('products', 'fr', 'heavyweight-hoodie', hoodie('fr'))
+await api(`products/${enHoodie}`, { method: 'PATCH', body: JSON.stringify({ translationOf: frHoodie }) })
+await api(`products/${frHoodie}`, { method: 'PATCH', body: JSON.stringify({ translationOf: enHoodie }) })
+console.log(`hoodie story: en ${enHoodie}, fr ${frHoodie}`)
+
