@@ -23,6 +23,21 @@ bun --env-file=/path/to/shopify.env apps/shop-setup/setup.ts --prune   # also de
                                                                         # and collection not in catalog.ts
 ```
 
+## Webhooks
+
+The storefront bakes prices, stock and collections in at build time, so Shopify must say when
+they change. With `SHOPIFY_WEBHOOK_URL` in the env file (the CMS's `/api/shopify/webhooks`), the
+script subscribes the store to product, stock and collection changes; the CMS checks each call,
+logs it and rebuilds the storefront (see `apps/cms`, "Rebuilds"). Already-subscribed topics are
+skipped. To subscribe without touching the catalogue:
+
+```sh
+bun --env-file=/path/to/shopify.env apps/shop-setup/setup.ts --webhooks
+```
+
+Shopify deletes a subscription after 8 failed calls in a row (about 4 hours of retries). If the
+CMS was down that long, run `--webhooks` again.
+
 The app's client ID and secret buy a 24-hour Admin token (client credentials grant); no permanent
 admin token exists. Photos are Unsplash stock under the Unsplash License, chosen so each product's
 data matches its photo; products without a matching photo have none.

@@ -126,6 +126,24 @@ if (secret) {
   check('preview: an expired link is refused', (await get(signed('pages', homeId, now - 1))).status === 403)
 } else console.log('skip preview: signed links need PAYLOAD_SECRET in the env')
 
+// Shopify webhooks (src/shopify.ts): only a call signed with the app's client secret is logged,
+// and a retry of the same call is not logged twice. The signed call asks for a real rebuild.
+const hook = (body, headers) => fetch(base + '/api/shopify/webhooks', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body })
+check('webhook: an unsigned call is refused', [401, 503].includes((await hook('{}', { 'x-shopify-webhook-id': 'smoke' })).status))
+check('webhook-events: anonymous cannot create', (await send('POST', '/api/webhook-events', { topic: 'x', rebuild: 'skipped', webhookId: 'x' }, {})).status === 403)
+const shopSecret = process.env.SHOPIFY_CLIENT_SECRET
+if (shopSecret) {
+  const body = JSON.stringify({ id: 1, title: 'Smoke', handle: 'smoke-test' })
+  const webhookId = `smoke-${Date.now()}`
+  const headers = { 'x-shopify-hmac-sha256': createHmac('sha256', shopSecret).update(body).digest('base64'), 'x-shopify-topic': 'products/update', 'x-shopify-webhook-id': webhookId }
+  const first = await hook(body, headers)
+  const again = await hook(body, headers)
+  const rows = (await get(`/api/webhook-events?where[webhookId][equals]=${webhookId}`)).body.docs ?? []
+  check('webhook: a signed call is logged once, retry included', first.status === 200 && again.status === 200 && rows.length === 1 && rows[0].summary === 'Smoke (smoke-test)', `${first.status} ${again.status} ${rows.length}`)
+  check('webhook: a changed body is refused', (await hook(body.replace('Smoke', 'Smoky'), headers)).status === 401)
+  for (const r of rows) await send('DELETE', `/api/webhook-events/${r.id}`)
+} else console.log('skip webhook: a signed call needs SHOPIFY_CLIENT_SECRET in the env')
+
 // Visitor door. Production holds the real Turnstile secret, which no script can pass, so only
 // the refusals run there. Locally Cloudflare's always-pass test keys open the whole door.
 const door = (headers = {}) =>

@@ -13,6 +13,7 @@ import { Media } from './collections/Media'
 import { Users } from './collections/Users'
 import { migrations } from './migrations'
 import { livePreview, previewEndpoint } from './preview'
+import { shopifyWebhook, WebhookEvents } from './shopify'
 import { sweepVisitors, visitorEnter } from './visitor'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -34,8 +35,8 @@ export default buildConfig({
     },
     livePreview: { collections: ['pages', 'articles', 'docs', 'products'], ...livePreview },
   },
-  collections: [Domains, Pages, Articles, Docs, Products, Site, Media, Users],
-  endpoints: [visitorEnter, previewEndpoint],
+  collections: [Domains, Pages, Articles, Docs, Products, Site, WebhookEvents, Media, Users],
+  endpoints: [visitorEnter, previewEndpoint, shopifyWebhook],
   // Cloud Run boots after every idle spell, so this sweep runs about daily on top of the door's.
   onInit: (payload) => {
     sweepVisitors(payload).catch((e) => payload.logger.error(`visitor sweep: ${e}`))

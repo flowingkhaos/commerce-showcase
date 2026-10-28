@@ -42,12 +42,17 @@ gcloud artifacts repositories describe showcase --location="$REGION" >/dev/null 
 gcloud storage buckets describe "gs://$BUCKET" >/dev/null 2>&1 \
   || gcloud storage buckets create "gs://$BUCKET" --location="$REGION" --uniform-bucket-level-access --public-access-prevention --quiet
 gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" --member="serviceAccount:$RUNTIME_SA" --role=roles/storage.objectAdmin --quiet >/dev/null
-# Optional: GITHUB_DISPATCH_TOKEN lets a publish start the storefront's deploy workflow.
+# Optional: GITHUB_DISPATCH_TOKEN lets a publish start the storefront's deploy workflow;
+# SHOPIFY_CLIENT_SECRET (the Shopify app's client secret) checks Shopify's webhook calls.
 PAIRS="cms-database-url:DATABASE_URL cms-payload-secret:PAYLOAD_SECRET cms-turnstile-secret:TURNSTILE_SECRET_KEY"
 RUN_SECRETS=DATABASE_URL=cms-database-url:latest,PAYLOAD_SECRET=cms-payload-secret:latest,TURNSTILE_SECRET_KEY=cms-turnstile-secret:latest
 if [ -n "$(val GITHUB_DISPATCH_TOKEN)" ]; then
   PAIRS="$PAIRS cms-github-dispatch:GITHUB_DISPATCH_TOKEN"
   RUN_SECRETS="$RUN_SECRETS,GITHUB_DISPATCH_TOKEN=cms-github-dispatch:latest"
+fi
+if [ -n "$(val SHOPIFY_CLIENT_SECRET)" ]; then
+  PAIRS="$PAIRS cms-shopify-client-secret:SHOPIFY_CLIENT_SECRET"
+  RUN_SECRETS="$RUN_SECRETS,SHOPIFY_CLIENT_SECRET=cms-shopify-client-secret:latest"
 fi
 for pair in $PAIRS; do
   name=${pair%%:*} key=${pair#*:}
@@ -81,5 +86,5 @@ gcloud run deploy "$SERVICE" --image="$TAG" --region="$REGION" --port=3000 \
   --set-secrets="$RUN_SECRETS" \
   --set-env-vars="SERVER_URL=$URL,GCS_BUCKET=$BUCKET,TURNSTILE_SITE_KEY=$(val TURNSTILE_SITE_KEY)" --quiet
 
-echo "== smoke $URL (PAYLOAD_SECRET lets it sign live preview links)"
-PAYLOAD_SECRET=$(val PAYLOAD_SECRET) SHOWCASE_CMS_CREDS="$ADMINFILE" node scripts/smoke.mjs "$URL"
+echo "== smoke $URL (the two secrets let it sign preview links and webhook calls)"
+PAYLOAD_SECRET=$(val PAYLOAD_SECRET) SHOPIFY_CLIENT_SECRET=$(val SHOPIFY_CLIENT_SECRET) SHOWCASE_CMS_CREDS="$ADMINFILE" node scripts/smoke.mjs "$URL"

@@ -62,16 +62,16 @@ export type SupportedTimezones =
   | 'Pacific/Fiji';
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "LexicalNodes_21DCB75E".
+ * via the `definition` "LexicalNodes_19D94598".
  */
-export type LexicalNodes_21DCB75E =
+export type LexicalNodes_19D94598 =
   | SerializedTextNode
   | SerializedTabNode
   | SerializedLineBreakNode
-  | SerializedParagraphNode<LexicalNodes_21DCB75E>
+  | SerializedParagraphNode<LexicalNodes_19D94598>
   | SerializedHorizontalRuleNode
   | SerializedUploadNode<'media'>
-  | SerializedQuoteNode<LexicalNodes_21DCB75E>
+  | SerializedQuoteNode<LexicalNodes_19D94598>
   | SerializedRelationshipNode<
       | 'domains'
       | 'pages'
@@ -79,17 +79,18 @@ export type LexicalNodes_21DCB75E =
       | 'docs'
       | 'products'
       | 'site'
+      | 'webhook-events'
       | 'users'
       | 'payload-kv'
       | 'payload-locked-documents'
       | 'payload-preferences'
       | 'payload-migrations'
     >
-  | SerializedAutoLinkNode<LexicalNodes_21DCB75E, LexicalLinkFields>
-  | SerializedLinkNode<LexicalNodes_21DCB75E, LexicalLinkFields>
-  | SerializedListNode<LexicalNodes_21DCB75E>
-  | SerializedListItemNode<LexicalNodes_21DCB75E>
-  | SerializedHeadingNode<LexicalNodes_21DCB75E>;
+  | SerializedAutoLinkNode<LexicalNodes_19D94598, LexicalLinkFields>
+  | SerializedLinkNode<LexicalNodes_19D94598, LexicalLinkFields>
+  | SerializedListNode<LexicalNodes_19D94598>
+  | SerializedListItemNode<LexicalNodes_19D94598>
+  | SerializedHeadingNode<LexicalNodes_19D94598>;
 /**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "LexicalNodes_3DE324E4".
@@ -115,6 +116,7 @@ export interface Config {
     docs: Doc;
     products: Product;
     site: Site;
+    'webhook-events': WebhookEvent;
     media: Media;
     users: User;
     'payload-kv': PayloadKv;
@@ -137,6 +139,7 @@ export interface Config {
     docs: DocsSelect<false> | DocsSelect<true>;
     products: ProductsSelect<false> | ProductsSelect<true>;
     site: SiteSelect<false> | SiteSelect<true>;
+    'webhook-events': WebhookEventsSelect<false> | WebhookEventsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -363,7 +366,7 @@ export interface User {
  * via the `definition` "RichText".
  */
 export interface RichText {
-  richText: LexicalRichText<LexicalNodes_21DCB75E>;
+  richText: LexicalRichText<LexicalNodes_19D94598>;
   html?: string | null;
   id?: string | null;
   blockName?: string | null;
@@ -375,7 +378,7 @@ export interface RichText {
  */
 export interface MediaText {
   heading?: string | null;
-  richText?: LexicalRichText<LexicalNodes_21DCB75E> | null;
+  richText?: LexicalRichText<LexicalNodes_19D94598> | null;
   html?: string | null;
   image: number | Media;
   imagePosition?: ('right' | 'left') | null;
@@ -637,6 +640,29 @@ export interface Site {
   createdAt: string;
 }
 /**
+ * Calls from Shopify, newest first, kept for a week. Only the CMS writes here.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "webhook-events".
+ */
+export interface WebhookEvent {
+  id: number;
+  topic: string;
+  summary?: string | null;
+  rebuild: 'requested' | 'failed' | 'skipped';
+  webhookId: string;
+  createdBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: number | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -683,6 +709,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'site';
         value: number | Site;
+      } | null)
+    | ({
+        relationTo: 'webhook-events';
+        value: number | WebhookEvent;
       } | null)
     | ({
         relationTo: 'media';
@@ -1077,6 +1107,20 @@ export interface SiteSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "webhook-events_select".
+ */
+export interface WebhookEventsSelect<T extends boolean = true> {
+  topic?: T;
+  summary?: T;
+  rebuild?: T;
+  webhookId?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "media_select".
  */
 export interface MediaSelect<T extends boolean = true> {
@@ -1222,7 +1266,8 @@ export interface CollectionsWidget {
 export interface CollectionQueryWidget {
   data?: {
     title?: string | null;
-    relatedCollection: 'domains' | 'pages' | 'articles' | 'docs' | 'products' | 'site' | 'media' | 'users';
+    relatedCollection:
+      'domains' | 'pages' | 'articles' | 'docs' | 'products' | 'site' | 'webhook-events' | 'media' | 'users';
     where?:
       | {
           [k: string]: unknown;
@@ -1245,7 +1290,7 @@ export interface CollectionQueryWidget {
 export interface ActivityWidget {
   data?: {
     excludedCollections?:
-      ('domains' | 'pages' | 'articles' | 'docs' | 'products' | 'site' | 'media' | 'users')[] | null;
+      ('domains' | 'pages' | 'articles' | 'docs' | 'products' | 'site' | 'webhook-events' | 'media' | 'users')[] | null;
   };
   width: 'small' | 'medium' | 'large' | 'x-large' | 'full';
 }

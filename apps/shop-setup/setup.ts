@@ -4,6 +4,7 @@
 // installed on a dev store in the same organization (client credentials grant, 24 h token).
 // Safe to re-run: products and collections are matched by handle and updated in place.
 // --prune deletes every product and collection that is not in catalog.ts (the sample data).
+// --webhooks only subscribes the webhooks (SHOPIFY_WEBHOOK_URL); see README.
 import { collections, fr, products, STOCK, type Product } from './catalog'
 
 const API = '2026-10'
@@ -67,6 +68,23 @@ for (const key of specKeys.filter((k) => !defined.has(k))) {
     { d: { name: key[0].toUpperCase() + key.slice(1), namespace: 'specs', key, type: 'single_line_text_field', ownerType: 'PRODUCT', access: { storefront: 'PUBLIC_READ' } } },
   )
 }
+
+// Webhooks: Shopify calls the CMS when a product, its stock or a collection changes, so the
+// prebuilt store rebuilds (apps/cms/src/shopify.ts). SHOPIFY_WEBHOOK_URL = the CMS's
+// /api/shopify/webhooks. --webhooks stops here, before the catalogue.
+const TOPICS = ['PRODUCTS_CREATE', 'PRODUCTS_UPDATE', 'PRODUCTS_DELETE', 'INVENTORY_LEVELS_UPDATE', 'COLLECTIONS_CREATE', 'COLLECTIONS_UPDATE', 'COLLECTIONS_DELETE']
+const hookUrl = process.env.SHOPIFY_WEBHOOK_URL
+if (hookUrl) {
+  const subscribed = (await gql(`{ webhookSubscriptions(first: 50) { nodes { topic uri } } }`)).webhookSubscriptions.nodes as { topic: string; uri: string }[]
+  for (const topic of TOPICS.filter((t) => !subscribed.some((s) => s.topic === t && s.uri === hookUrl))) {
+    await gql(
+      `mutation ($t: WebhookSubscriptionTopic!, $s: WebhookSubscriptionInput!) { webhookSubscriptionCreate(topic: $t, webhookSubscription: $s) { userErrors { field message } } }`,
+      { t: topic, s: { uri: hookUrl } },
+    )
+    console.log(`webhook ${topic} → ${hookUrl}`)
+  }
+} else console.log('webhooks skipped: set SHOPIFY_WEBHOOK_URL to subscribe them')
+if (process.argv.includes('--webhooks')) process.exit(0)
 
 if (prune) {
   const keepP = new Set(products.map((p) => p.handle))

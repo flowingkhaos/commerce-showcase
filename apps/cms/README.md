@@ -49,7 +49,9 @@ bash deploy/cloudrun.sh <gcp-project-id> --seed   # first time; later runs witho
 
 Needs `gcloud auth login`, podman, and `~/.config/kos/showcase-cms.prod.env` (mode 600) with
 `DATABASE_URL` (Neon), `PAYLOAD_SECRET`, `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` (the
-"Showcase CMS visitor door" Turnstile widget, hosts: the Cloud Run host and localhost). The script migrates Neon from here, builds and pushes
+"Showcase CMS visitor door" Turnstile widget, hosts: the Cloud Run host and localhost). Optional:
+`GITHUB_DISPATCH_TOKEN` and `SHOPIFY_CLIENT_SECRET` (see Rebuilds); each becomes a Cloud Run secret
+when present. The script migrates Neon from here, builds and pushes
 the image, deploys (max 1 instance, 512 MiB, zero when idle) and runs the smoke against the live
 URL. The prod admin login and API key go to `~/.config/kos/showcase-cms.prod-admin.env`.
 Live: https://showcase-cms-1065657380974.us-east5.run.app (a $1 CAD budget alert guards the project).
@@ -66,6 +68,13 @@ never do. GitHub keeps one build running and one waiting, so a burst of publishe
 build. It needs `GITHUB_DISPATCH_TOKEN`: a fine-grained token on the storefront repo with only
 **Actions: read and write**. Without it, publishing works and the nightly build catches up.
 
+Shopify changes rebuild it too. Shopify calls `POST /api/shopify/webhooks` when a product, its
+stock or a collection changes (`apps/shop-setup` subscribes the topics). The CMS checks the
+`X-Shopify-Hmac-SHA256` signature with `SHOPIFY_CLIENT_SECRET` (the Shopify app's client secret;
+unset = the endpoint answers 503), asks GitHub for the build, and writes one row to
+`webhook-events` (`src/shopify.ts`). A retry of the same call (same `X-Shopify-Webhook-Id`) is
+answered 200 and not logged twice. Rows older than a week are deleted.
+
 ## Read contract (for the sites)
 
 Anonymous `GET`, no credentials. Anonymous reads return **published documents only**; drafts
@@ -79,6 +88,7 @@ never leak, even with `draft=true`. Max `depth` is 2.
 | `products` | `/api/products?where[domain.slug][equals]=<domain>&where[locale][equals]=<fr\|en>&depth=1&limit=100` |
 | `site` | `/api/site?where[domain.slug][equals]=<domain>&where[locale][equals]=<fr\|en>&depth=0` (one doc) |
 | `domains` | `/api/domains?depth=0` |
+| `webhook-events` | `/api/webhook-events?sort=-createdAt&limit=8&depth=0` |
 
 Every content doc: `id`, `title`, `slug`, `locale` (`fr` \| `en`), `domain` (object at depth ≥ 1),
 `translationOf` (the other-language doc, or null), `meta { title, description, image }`,
@@ -93,6 +103,11 @@ Every content doc: `id`, `title`, `slug`, `locale` (`fr` \| `en`), `domain` (obj
 **Site** is one doc per `(domain, locale)` (unique): `nav[] { label, url }` (at most 8),
 `footer[] { heading, links[] { label, url } }` (at most 6 columns of 8 links), `footerNote`.
 No drafts: what the operator saves is live.
+
+**Webhook events** are Shopify's calls, newest first, kept a week: `topic` (as Shopify names it,
+e.g. `products/update`), `summary` (a title and handle, or a stock count), `rebuild` (`requested`
+\| `failed` \| `skipped`: GitHub took the build request, refused it, or the CMS has no token),
+`webhookId`, `createdAt`. Only the CMS writes them.
 
 **Domains seeded:** `store` (OVRLD, kind store), `blog-demo` (blog), `renovation-demo` (Linteau,
 site), `plumbing-demo` (Clapet, site). All `planned` until their site is live.
@@ -174,4 +189,5 @@ Working examples: the renovation and plumbing demos (`pages/Preview.tsx` in each
 
 ## Not built yet
 
-The Shopify webhook endpoint and its webhook-events log.
+Nothing on the store's list. A failed build request is not retried; the next change or the
+nightly build covers it.
