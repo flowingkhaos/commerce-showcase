@@ -57,6 +57,15 @@ One-time step if your Google Cloud organization refuses public (`allUsers`) acce
 `gcloud run services update showcase-cms --region=us-east5 --no-invoker-iam-check`; it persists.
 `deploy/compose.yml` + `Caddyfile` run the same image with its own Postgres on any one VM.
 
+## Rebuilds
+
+The storefront is prebuilt, so its pages change only when it is built again. When a published
+`store` page, doc, product story or `site` doc changes (or a published one is deleted), the CMS
+asks GitHub to run the storefront's `deploy-web` workflow (`src/rebuild.ts`). Draft autosaves
+never do. GitHub keeps one build running and one waiting, so a burst of publishes becomes one
+build. It needs `GITHUB_DISPATCH_TOKEN`: a fine-grained token on the storefront repo with only
+**Actions: read and write**. Without it, publishing works and the nightly build catches up.
+
 ## Read contract (for the sites)
 
 Anonymous `GET`, no credentials. Anonymous reads return **published documents only**; drafts
@@ -165,4 +174,4 @@ Working examples: the renovation and plumbing demos (`pages/Preview.tsx` in each
 
 ## Not built yet
 
-The webhook-events collection and rebuild dispatch.
+The Shopify webhook endpoint and its webhook-events log.

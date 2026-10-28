@@ -12,9 +12,10 @@ import {
   publishedOrAdmin,
   visitorSandbox,
 } from '../fields'
+import { rebuildOnChange, rebuildOnDelete } from '../rebuild'
 
 const access = { read: publishedOrAdmin, create: adminOrVisitor, update: adminOrOwnDraft, delete: adminOrOwnDraft }
-const hooks = { beforeChange: [visitorSandbox] }
+const hooks = { beforeChange: [visitorSandbox], afterChange: [rebuildOnChange], afterDelete: [rebuildOnDelete] }
 const columns = ['title', 'domain', 'locale', 'slug', '_status', 'updatedAt']
 // Autosave every 3 s (architecture § Backend shape): each save reloads the live preview.
 const versions = { drafts: { autosave: { interval: 3000 } } }
@@ -107,6 +108,7 @@ const linkList = (name: string): Field => ({
 export const Site: CollectionConfig = {
   slug: 'site',
   versions: false,
+  hooks: { afterChange: [rebuildOnChange], afterDelete: [rebuildOnDelete] },
   admin: { group: 'Content', defaultColumns: ['domain', 'locale', 'updatedAt'] },
   access: { read: anyone, create: isAdmin, update: isAdmin, delete: isAdmin },
   indexes: [{ fields: ['domain', 'locale'], unique: true }],
